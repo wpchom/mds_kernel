@@ -20,7 +20,7 @@ target("mds_kernel", function()
     on_load(function(target)
         local archfile = os.scriptdir() .. "/src/arch/" .. get_config("arch") .. ".c"
         if not os.exists(archfile) then
-            raise("arch file not found: %s", archfile)
+            target:add("files", os.scriptdir() .. "/src/arch/default/default.c")
         else
             target:add("files", (archfile))
         end

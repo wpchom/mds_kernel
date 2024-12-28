@@ -281,7 +281,7 @@ void PendSV_Handler(void)
     __asm volatile("cpsid       i" : : : "memory");
 
     // r1 = g_coreScheduler
-    __asm volatile("ldr         r1, =%0" : : "X"(g_coreScheduler));
+    __asm volatile("ldr         r1, =%0" : : "X"(&g_coreScheduler));
 
     // if (g_coreScheduler.swflag) {
     __asm volatile("ldr         r2, [r1, #0x00]");

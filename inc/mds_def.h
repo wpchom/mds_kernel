@@ -183,7 +183,16 @@ static inline bool MDS_ListIsEmpty(const MDS_ListNode_t *node)
     return (node->prev == node);
 }
 
-extern size_t MDS_ListGetLength(const MDS_ListNode_t *list);
+static inline size_t MDS_ListGetLength(const MDS_ListNode_t *list)
+{
+    size_t len = 0;
+
+    for (MDS_ListNode_t *node = list->next; node != list; node = node->next) {
+        len += 1;
+    }
+
+    return (len);
+}
 
 #define MDS_LIST_FOREACH_NEXT(iter, member, head)                                                                      \
     for ((iter) = CONTAINER_OF((head)->next, __typeof__(*(iter)), member); &((iter)->member) != (head);                \
