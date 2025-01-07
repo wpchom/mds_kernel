@@ -1,0 +1,157 @@
+declare_args() {
+  # log
+  mds_log_build_level = "MDS_LOG_LEVEL_INFO"
+  mds_assert_enable = false
+
+  # lib
+  mds_library_miniable = false
+
+  # tick
+  mds_clock_tick_freq_hz = 1000
+
+  # core
+  mds_core_arch = ""
+  mds_core_backtrace_depth = 16
+
+  # obj
+  mds_object_name_size = 7
+
+  # kernel
+  mds_kernel_thread_priority_max = 32
+  mds_kernel_hook_enable = false
+  mds_kernel_stats_enable = false
+  mds_kernel_timer_disable = false
+
+  #timer
+  mds_timer_thread_enable = false
+  mds_timer_thread_priority = 0
+  mds_timer_thread_stacksize = 256
+  mds_timer_thread_ticks = 16
+
+  # idle
+  mds_idle_thread_stacksize = 384
+  mds_idle_thread_ticks = 16
+  mds_idle_lpc_enable = false
+}
+
+config("mds_kernel_config") {
+  include_dirs = [ "inc/" ]
+
+  assert(mds_log_build_level == "MDS_LOG_LEVEL_OFF" ||
+         mds_log_build_level == "MDS_LOG_LEVEL_TRACK" ||
+         mds_log_build_level == "MDS_LOG_LEVEL_FATAL" ||
+         mds_log_build_level == "MDS_LOG_LEVEL_ERROR" ||
+         mds_log_build_level == "MDS_LOG_LEVEL_WARN" ||
+         mds_log_build_level == "MDS_LOG_LEVEL_INFO" ||
+         mds_log_build_level == "MDS_LOG_LEVEL_DEBUG" ||
+         mds_log_build_level == "MDS_LOG_LEVEL_TRACE")
+  defines = [ "MDS_LOG_BUILD_LEVEL=${mds_log_build_level}" ]
+
+  if (defined(mds_assert_enable) && mds_assert_enable) {
+    defines += [ "MDS_ASSERT_ENABLE=1" ]
+  }
+
+  if (defined(mds_clock_tick_freq_hz)) {
+    assert(mds_clock_tick_freq_hz > 0)
+    defines += [ "MDS_CLOCK_TICK_FREQ_HZ=${mds_clock_tick_freq_hz}" ]
+  }
+
+  if (defined(mds_object_name_size)) {
+    assert(mds_object_name_size > 0)
+    defines += [ "MDS_OBJECT_NAME_SIZE=${mds_object_name_size}" ]
+  }
+
+  if (defined(mds_kernel_thread_priority_max)) {
+    defines +=
+        [ "MDS_KERNEL_THREAD_PRIORITY_MAX=${mds_kernel_thread_priority_max}" ]
+  }
+
+  if (defined(mds_kernel_hook_enable) && mds_kernel_hook_enable) {
+    defines += [ "MDS_KERNEL_HOOK_ENABLE=1" ]
+  }
+
+  if (defined(mds_kernel_stats_enable) && mds_kernel_stats_enable) {
+    defines += [ "MDS_KERNEL_STATS_ENABLE=1" ]
+  }
+}
+
+static_library("mds_kernel") {
+  defines = []
+
+  sources = [
+    "src/device.c",
+    "src/library.c",
+    "src/log.c",
+    "src/object.c",
+  ]
+
+  if (mds_kernel_thread_priority_max == 0) {
+    sources += [ "src/nosys.c" ]
+
+    if (defined(mds_kernel_timer_disable) && mds_kernel_timer_disable) {
+      defines += [ "MDS_KERNEL_TIMER_DISABLE=1" ]
+    }
+  } else {
+    sources += [
+      "src/sys/clock.c",
+      "src/sys/idle.c",
+      "src/sys/ipc.c",
+      "src/sys/kernel.c",
+      "src/sys/lpc.c",
+      "src/sys/scheduler.c",
+      "src/sys/thread.c",
+      "src/sys/timer.c",
+    ]
+
+    assert(mds_kernel_timer_disable == false,
+           "timer should be enabled with thread")
+
+    if (defined(mds_timer_thread_eanble) && mds_timer_thread_eanble) {
+      defines += [ "MDS_TIMER_THREAD_ENABLE=1" ]
+    }
+    if (defined(mds_timer_thread_priority)) {
+      defines += [ "MDS_TIMER_THREAD_PRIORITY=${mds_timer_thread_priority}" ]
+    }
+    if (defined(mds_timer_thread_stacksize)) {
+      assert(mds_timer_thread_stacksize > 0)
+      defines += [ "MDS_TIMER_THREAD_STACKSIZE=${mds_timer_thread_stacksize}" ]
+    }
+    if (defined(mds_timer_thread_ticks)) {
+      assert(mds_timer_thread_ticks > 0)
+      defines += [ "MDS_TIMER_THREAD_TICKS=${mds_timer_thread_ticks}" ]
+    }
+
+    if (defined(mds_idle_thread_stacksize)) {
+      assert(mds_idle_thread_stacksize > 0)
+      defines += [ "MDS_IDLE_THREAD_STACKSIZE=${mds_idle_thread_stacksize}" ]
+    }
+    if (defined(mds_idle_thread_ticks)) {
+      assert(mds_idle_thread_ticks > 0)
+      defines += [ "MDS_IDLE_THREAD_TICKS=${mds_idle_thread_ticks}" ]
+    }
+    if (defined(mds_idle_lpc_enable) && mds_idle_lpc_enable) {
+      defines += [ "MDS_IDLE_LPC_ENABLE=1" ]
+    }
+  }
+
+  sources += [
+    "src/mem/llff.c",
+    "src/mem/memory.c",
+  ]
+
+  if (defined(mds_core_arch) && mds_core_arch != "") {
+    sources += [ "src/arch/" + mds_core_arch + ".c" ]
+  } else {
+    sources += [ "src/arch/default/default.c" ]
+  }
+
+  if (defined(mds_library_miniable) && mds_library_miniable) {
+    defines += [ "MDS_LIBRARY_MINIABLE=1" ]
+  }
+
+  if (defined(mds_core_backtrace_depth)) {
+    defines += [ "MDS_CORE_BACKTRACE_DEPTH=${mds_core_backtrace_depth}" ]
+  }
+
+  public_configs = [ ":mds_kernel_config" ]
+}
