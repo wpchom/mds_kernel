@@ -11,6 +11,7 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
+#include "mds_lpc.h"
 #include "mds_log.h"
 
 /* Timer ------------------------------------------------------------------- */
@@ -608,7 +609,7 @@ void MDS_ClockIncTickCount(void)
     MDS_SysTimerCheck();
 }
 
-__attribute__((weak)) MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
+MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
     MDS_Time_t ts = g_unixTimeBase + MDS_ClockTickToMs(ticks);
@@ -620,10 +621,51 @@ __attribute__((weak)) MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
     return (ts);
 }
 
-__attribute__((weak)) void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
+void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
 
     g_unixTimeBase = ts - MDS_ClockTickToMs(ticks);
     g_unixTimeZone = tz;
+}
+
+/* LowPowerControl --------------------------------------------------------- */
+typedef struct MDS_LPC_Manager {
+    const MDS_LPC_ManagerOps_t *ops;
+    MDS_Tick_t sleepThreshold;
+    MDS_LPC_Sleep_t sleepDefault : 8;
+    MDS_LPC_Run_t runDefault     : 8;
+    MDS_LPC_Run_t runMode        : 8;
+} MDS_LPC_Manager_t;
+
+static MDS_ListNode_t g_lpcDevList = {.next = &g_lpcDevList, .prev = &g_lpcDevList};
+static MDS_LPC_Manager_t g_lpcMgr;
+
+MDS_LPC_Run_t MDS_LPC_Init(const MDS_LPC_ManagerOps_t *ops, MDS_Tick_t threshold, MDS_LPC_Sleep_t sleep,
+                           MDS_LPC_Run_t run)
+{
+    g_lpcMgr.ops = ops;
+    g_lpcMgr.sleepThreshold = threshold;
+    g_lpcMgr.sleepDefault = sleep;
+    g_lpcMgr.runDefault = run;
+
+    // LPC_RunModeSwitch(&g_lpcMgr);
+
+    return (g_lpcMgr.runMode);
+}
+
+MDS_Err_t MDS_LPC_DeviceRegister(MDS_LPC_Device_t *device, MDS_Arg_t *dev, const MDS_LPC_DeviceOps_t *ops)
+{
+    MDS_ASSERT(device != NULL);
+
+    MDS_ListInitNode(&(device->node));
+    device->dev = dev;
+    device->ops = ops;
+    MDS_ListInsertNodeNext(&g_lpcDevList, &(device->node));
+
+    if ((device->ops != NULL) && (device->ops->resume != NULL)) {
+        device->ops->resume(device->dev, g_lpcMgr.runMode);
+    }
+
+    return (MDS_EOK);
 }

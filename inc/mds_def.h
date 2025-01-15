@@ -239,15 +239,31 @@ extern size_t MDS_MsgListCopyBuff(void *buff, size_t size, const MDS_MsgList_t *
 extern bool MDS_MemAddrIsAligned(const void *address, uintptr_t align);
 extern void *MDS_MemBuffSet(void *dst, int c, size_t len);
 extern size_t MDS_MemBuffCopy(void *dst, size_t size, const void *src, size_t len);
+extern void *MDS_MemBuffCpy(void *dst, const void *src, size_t size);
 extern void *MDS_MemBuffCcpy(void *dst, const void *src, int c, size_t size);
+extern int MDS_MemBuffCmp(const void *buf1, const void *buf2, size_t size);
 
 /* String ------------------------------------------------------------------ */
 extern size_t MDS_StrAscLetterLength(const char *str);
 extern size_t MDS_StrAscNumberLength(const char *str, int base);
 extern size_t MDS_StrAsc2Hex(uint8_t *hex, size_t size, const char *asc, bool rightAlign);
 extern size_t MDS_StrHex2Asc(char *asc, size_t size, const uint8_t *hex, size_t len, bool lowCase);
+extern unsigned long long MDS_Strtoull(const char *str, char **context, int base);
+extern long long MDS_Strtoll(const char *str, char **context, int base);
+extern unsigned long MDS_Strtoul(const char *str, char **context, int base);
+extern long MDS_Strtol(const char *str, char **context, int base);
 
-/* Time ----------------------------------------------------------------- */
+/* Format ------------------------------------------------------------------ */
+extern int MDS_VaStringNPrintf(char *buff, size_t size, const char *fmt, va_list ap);
+extern int MDS_StringNPrintf(char *buff, size_t size, const char *fmt, ...);
+extern int MDS_VaStringPrintf(char *buff, const char *fmt, va_list ap);
+extern int MDS_StringPrintf(char *buff, const char *fmt, ...);
+extern int MDS_VaStringScanf(const char *buff, const char *fmt, va_list ap);
+extern int MDS_StringScanf(const char *buff, const char *fmt, ...);
+extern int MDS_VaStringScanfS(const char *buff, const char *fmt, va_list ap);
+extern int MDS_StringScanfS(const char *buff, const char *fmt, ...);
+
+/* Time -------------------------------------------------------------------- */
 #define MDS_TIME_NSEC_OF_SEC  1000000000
 #define MDS_TIME_USEC_OF_SEC  1000000
 #define MDS_TIME_MSEC_OF_SEC  1000

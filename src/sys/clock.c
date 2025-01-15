@@ -46,7 +46,7 @@ void MDS_ClockIncTickCount(void)
     MDS_SysTimerCheck();
 }
 
-__attribute__((weak)) MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
+MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
     MDS_Time_t ts = g_unixTimeBase + MDS_ClockTickToMs(ticks);
@@ -58,7 +58,7 @@ __attribute__((weak)) MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
     return (ts);
 }
 
-__attribute__((weak)) void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
+void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
 

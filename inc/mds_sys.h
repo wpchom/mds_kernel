@@ -44,7 +44,7 @@ typedef void (*MDS_InitFunc_t)(void);
     static const                                                                                                       \
         __attribute__((used, section(MDS_INIT_SECTION priority #func))) MDS_InitFunc_t __MDS_INIT_##func = (func)
 
-static inline void MDS_InitPorting(void)
+static inline void MDS_InitExport(void)
 {
     static const __attribute__((section(MDS_INIT_SECTION "\000"))) void *initBegin = NULL;
     static const __attribute__((section(MDS_INIT_SECTION "\177"))) void *initLimit = NULL;

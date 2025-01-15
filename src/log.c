@@ -13,13 +13,19 @@
 #include "mds_def.h"
 #include "mds_log.h"
 
+static void (*g_logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap) = NULL;
+
 /* Function ---------------------------------------------------------------- */
-__attribute__((weak)) void MDS_LOG_VaPrintf(size_t level, const void *fmt, size_t cnt, va_list ap)
+void MDS_LOG_Register(void (*logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap))
 {
-    UNUSED(level);
-    UNUSED(fmt);
-    UNUSED(cnt);
-    UNUSED(ap);
+    g_logVaPrintf = logVaPrintf;
+}
+
+void MDS_LOG_VaPrintf(size_t level, const void *fmt, size_t cnt, va_list ap)
+{
+    if (g_logVaPrintf != NULL) {
+        g_logVaPrintf(level, fmt, cnt, ap);
+    }
 }
 
 void MDS_LOG_Printf(size_t level, const void *fmt, size_t cnt, ...)

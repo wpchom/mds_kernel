@@ -48,6 +48,7 @@ extern "C" {
     MDS_LOG_ARG_SEQS(0, ##__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
 /* Function ---------------------------------------------------------------- */
+extern void MDS_LOG_Register(void (*logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap));
 extern void MDS_LOG_VaPrintf(size_t level, const void *fmt, size_t cnt, va_list ap);
 extern void MDS_LOG_Printf(size_t level, const void *fmt, size_t cnt, ...);
 
