@@ -1,6 +1,7 @@
 declare_args() {
   # log
   mds_log_build_level = "MDS_LOG_LEVEL_INFO"
+  mds_log_compress_args_nums = 7
   mds_assert_enable = false
 
   # lib

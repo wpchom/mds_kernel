@@ -47,7 +47,25 @@ extern "C" {
 #define MDS_LOG_ARG_NUMS(...)                                                                                          \
     MDS_LOG_ARG_SEQS(0, ##__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
-/* Function ---------------------------------------------------------------- */
+/* Compress ---------------------------------------------------------------- */
+#ifndef MDS_LOG_COMPRESS_ARGS_NUMS
+#define MDS_LOG_COMPRESS_ARGS_NUMS 7
+#endif
+
+typedef struct MDS_LOG_Compress {
+    uint8_t magic;
+    uint32_t address   : 24;  // 0xFFxxxxxx
+    uint32_t level     : 4;
+    uint32_t count     : 4;
+    uint32_t psn       : 12;
+    uint64_t timestamp : 44;  // ms
+    uint32_t args[MDS_LOG_COMPRESS_ARGS_NUMS];
+} MDS_LOG_Compress_t;
+
+extern size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, va_list ap);
+extern size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, ...);
+
+/* Log ---------------------------------------------------------------------- */
 extern void MDS_LOG_Register(void (*logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap));
 extern void MDS_LOG_VaPrintf(size_t level, const void *fmt, size_t cnt, va_list ap);
 extern void MDS_LOG_Printf(size_t level, const void *fmt, size_t cnt, ...);

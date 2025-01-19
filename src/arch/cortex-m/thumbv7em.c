@@ -233,6 +233,7 @@ bool MDS_CoreThreadStackCheck(MDS_Thread_t *thread)
 }
 
 /* CoreScheduler ----------------------------------------------------------- */
+#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX > 0))
 static struct CoreScheduler {
     uintptr_t swflag;
     uintptr_t *fromSP;
@@ -276,7 +277,6 @@ void MDS_CoreSchedulerSwitch(void *fromSP, void *toSP)
     SCB->ICSR = 0x10000000;
 }
 
-#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX > 0))
 __attribute__((naked)) void PendSV_SwtichThread(void);
 __attribute__((naked)) void PendSV_SwtichExit(void);
 __attribute__((naked)) void PendSV_Handler(void)
@@ -408,10 +408,8 @@ __attribute__((weak)) void MDS_CoreExceptionCallback(bool exit)
     UNUSED(exit);
 }
 
-void MDS_CoreBacktrace(void)
+static void CORE_ExceptionBacktrace(void)
 {
-    MDS_CoreExceptionCallback(false);
-
 #if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH > 0))
     uintptr_t msp = CORE_GetMSP();
     const uintptr_t **SCB_VTOR_STACK = (const uintptr_t **)0xE000ED08;
@@ -426,12 +424,21 @@ void MDS_CoreBacktrace(void)
         CORE_StackBacktrace(psp, (uintptr_t)(thread->stackBase) + thread->stackSize, MDS_CORE_BACKTRACE_DEPTH);
     }
 #endif
+}
+
+void MDS_CorePanicTrace(void)
+{
+    MDS_CoreExceptionCallback(false);
+
+    CORE_ExceptionBacktrace();
 
     MDS_CoreExceptionCallback(true);
 }
 
 static __attribute__((noreturn)) void MDS_CoreHardFaultException(struct ExceptionInfo *excInfo)
 {
+    MDS_CoreExceptionCallback(false);
+
     if (g_exceptionContext == NULL) {
         g_exceptionContext = &(excInfo->stack);
 
@@ -445,8 +452,10 @@ static __attribute__((noreturn)) void MDS_CoreHardFaultException(struct Exceptio
         MDS_LOG_F("r12:%p lr :%p pc :%p psr:%p ", g_exceptionContext->exception.r12, g_exceptionContext->exception.lr,
                   g_exceptionContext->exception.pc, g_exceptionContext->exception.psr);
 
-        MDS_CoreBacktrace();
+        CORE_ExceptionBacktrace();
     }
+
+    MDS_CoreExceptionCallback(true);
 
     for (;;) {
     }

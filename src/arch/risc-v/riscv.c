@@ -12,11 +12,11 @@
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
 
-/* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(INTERRUPT_ENTER, MDS_Item_t irq);
-MDS_HOOK_INIT(INTERRUPT_EXIT, MDS_Item_t irq);
+/* Define ----------------------------------------------------------------- */
+#ifndef MDS_CORE_BACKTRACE_DEPTH
+#define MDS_CORE_BACKTRACE_DEPTH 16
+#endif
 
-/* Define ------------------------------------------------------------------ */
 #define MSTATUS_UIE  0x00000001
 #define MSTATUS_SIE  0x00000002
 #define MSTATUS_HIE  0x00000004
@@ -317,6 +317,12 @@ __attribute__((naked)) void ContextStackExit(void)
     __asm volatile("mret" : : : "memory");
 }
 
+#if defined(__IAR_SYSTEMS_ICC__)
+const uintptr_t __StackTop[] = __section_end(".stack");
+#else
+extern void __StackTop();
+#endif
+
 /* CoreFunction ------------------------------------------------------------ */
 inline intptr_t MDS_CoreInterruptCurrent(void)
 {
@@ -387,11 +393,14 @@ bool MDS_CoreThreadStackCheck(MDS_Thread_t *thread)
         return (false);
     }
 
+#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE > 0))
+#endif
+
     return (true);
 }
 
 /* CoreScheduler ----------------------------------------------------------- */
-#if (defined(MDS_THREAD_PRIORITY_NUMS) && (MDS_THREAD_PRIORITY_NUMS > 0))
+#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX > 0))
 static struct CoreScheduler {
     uintptr_t swflag;
     uintptr_t *fromSP;
@@ -421,11 +430,6 @@ __attribute__((naked)) void MDS_CoreSchedulerSwitchHandler(void)
 void Trap_Handler(void);
 void MDS_CoreSchedulerStartup(void *toSP)
 {
-#if defined(__IAR_SYSTEMS_ICC__)
-    const uintptr_t __StackTop[] = __section_end(".stack");
-#else
-    extern void __StackTop();
-#endif
     register MDS_Item_t lock = MDS_CoreInterruptLock();
 
     __asm volatile("csrw    mscratch, %0" : : "r"(__StackTop));
@@ -477,7 +481,7 @@ void MDS_CoreSchedulerSwitch(void *fromSP, void *toSP)
 #endif
 
 /* Backtrace --------------------------------------------------------------- */
-#if (defined(MDS_CORE_BACKTRACE) && (MDS_CORE_BACKTRACE > 0))
+#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH > 0))
 __attribute__((weak)) bool MDS_CoreStackPointerInCode(uintptr_t pc)
 {
 #if defined(__IAR_SYSTEMS_ICC__)
@@ -491,55 +495,99 @@ __attribute__((weak)) bool MDS_CoreStackPointerInCode(uintptr_t pc)
     return (((uintptr_t)__text_start <= pc) && (pc <= (uintptr_t)__text_end)) ? (true) : (false);
 }
 
-static bool CORE_DisassemblyInsIsBL(uintptr_t addr)
+static uintptr_t CORE_DisassemblyInsIsBL(uintptr_t addr)
 {
-    uint16_t ins1 = *((uint16_t *)addr);
-    uint16_t ins2 = *((uint16_t *)(addr + 0x02U));
+#if (defined(__riscv_flen) && (__riscv_flen == 64))
+#else
+#define RV32I_OP_MASK 0x00000003
 
-#define BL_INS_MASK  0xF800
-#define BL_INS_HIGH  0xF800
-#define BL_INS_LOW   0xF000
-#define BLX_INX_MASK 0xFF00
-#define BLX_INX      0x4700
+#define RV32I_JAL_MASK  0x0000007F
+#define RV32I_JAL_INS   0x0000006F
+#define RV32I_JALR_MASK 0x0000707F
+#define RV32I_JALR_INS  0x00000067
 
-    if (((ins2 & BL_INS_MASK) == BL_INS_HIGH) && ((ins1 & BL_INS_MASK) == BL_INS_LOW)) {
-        return (true);
-    } else if ((ins2 & BLX_INX_MASK) == BLX_INX) {
-        return (true);
+#define RV32C_JAL_MASK  0xE003
+#define RV32C_JAL_INS   0x2002
+#define RV32C_JALR_MASK 0xF003
+#define RV32C_JALR_INS  0x9002
+
+    uint32_t ins2 = *((uint16_t *)(addr + sizeof(uint16_t)));
+    uint32_t ins1 = ins2 << (MDS_BITS_OF_BYTE * sizeof(uint16_t)) | *((uint16_t *)(addr));
+
+    if (((ins1 & RV32I_JAL_MASK) == RV32I_JAL_INS) || (ins1 & RV32I_JALR_MASK) == RV32I_JALR_INS) {
+        return (addr);
+    } else if (((ins1 & RV32I_OP_MASK) != RV32I_OP_MASK) &&
+               (((ins2 & RV32C_JAL_MASK) == RV32C_JAL_INS) || ((ins2 & RV32C_JALR_MASK) == RV32C_JALR_INS))) {
+        return (addr + sizeof(uint16_t));
     } else {
-        return (false);
+        return (0);
     }
+#endif
 }
 
-__attribute__((weak)) void MDS_CoreBackTrace(uintptr_t stackPoint, uintptr_t stackLimit)
+static void CORE_StackBacktrace(uintptr_t stackPoint, uintptr_t stackLimit)
 {
-#ifndef MDS_CORE_BACKTRACE_DEPTH
-#define MDS_CORE_BACKTRACE_DEPTH 16
-#endif
-
-    for (size_t depth = 0; (depth < MDS_CORE_BACKTRACE_DEPTH) && (stackPoint < stackLimit);
-         stackPoint += sizeof(uintptr_t)) {
-        uintptr_t pc = *((uintptr_t *)stackPoint) - sizeof(uintptr_t) - 1;
-        if (MDS_CoreStackPointerInCode(pc) && CORE_DisassemblyInsIsBL(pc)) {
-            MDS_LOG_F("[BACKTRACE] %d: %p", depth, pc);
-            depth += 1;
+    for (size_t dp = 0; (dp < MDS_CORE_BACKTRACE_DEPTH) && (stackPoint < stackLimit); stackPoint += sizeof(uintptr_t)) {
+        uintptr_t pc = *((uintptr_t *)stackPoint) - sizeof(uintptr_t);
+        if (!MDS_CoreStackPointerInCode(pc)) {
+            continue;
+        }
+        pc = CORE_DisassemblyInsIsBL(pc);
+        if (pc != 0) {
+            MDS_LOG_F("[BACKTRACE] %d: %p", dp, pc);
+            dp += 1;
         }
     }
 }
 #endif
 
 /* Exception --------------------------------------------------------------- */
-__attribute__((weak)) void MDS_CoreExceptionCallback(void)
-{
-}
-
-#if (defined(MDS_CORE_BACKTRACE) && (MDS_CORE_BACKTRACE > 0))
 static struct StackFrame *g_exceptionContext = NULL;
 
-__attribute__((noreturn)) void Exception_Handler(uintptr_t sp)
+__attribute__((weak)) void MDS_CoreExceptionCallback(bool exit)
 {
-    register uintptr_t mcause, mepc, mtval;
+    UNUSED(exit);
+}
+
+static void CORE_ExceptionBacktrace(uintptr_t mcause, uintptr_t mscratch, uintptr_t sp)
+{
+    UNUSED(mcause);
+    UNUSED(mscratch);
+    UNUSED(sp);
+
+#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH > 0))
+    MDS_LOG_F("mcause:%d mscratch:0x%x sp:0x%x backtrace", mcause, mscratch, sp);
+    CORE_StackBacktrace((mscratch != 0) ? (mscratch) : (sp), (uintptr_t)__StackTop);
+
+    MDS_Thread_t *thread = MDS_KernelCurrentThread();
+    if (thread != NULL) {
+        MDS_LOG_F("current thread(%p) entry:%p sp:%p stackbase:%p stacksize:%u backtrace", thread, thread->entry, sp,
+                  thread->stackBase, thread->stackSize);
+        CORE_StackBacktrace(sp, (uintptr_t)(thread->stackBase) + thread->stackSize);
+    }
+#endif
+}
+
+void MDS_CorePanicTrace(void)
+{
+    MDS_CoreExceptionCallback(false);
+
+    register intptr_t mcause, mscratch, sp;
     __asm volatile("csrr        %0, mcause" : "=r"(mcause));
+    __asm volatile("csrr        %0, mscratch" : "=r"(mscratch));
+    __asm volatile("mv          %0, sp");
+
+    CORE_ExceptionBacktrace(mcause, mscratch, sp);
+
+    MDS_CoreExceptionCallback(true);
+}
+
+__attribute__((noreturn)) void Exception_Handler(uintptr_t mcause, uintptr_t mscratch, uintptr_t sp)
+{
+    uintptr_t mepc, mtval;
+
+    MDS_CoreExceptionCallback(false);
+
     __asm volatile("csrr        %0, mepc" : "=r"(mepc));
     __asm volatile("csrr        %0, mtval" : "=r"(mtval));
 
@@ -547,28 +595,32 @@ __attribute__((noreturn)) void Exception_Handler(uintptr_t sp)
 
     if (g_exceptionContext == NULL) {
         g_exceptionContext = (struct StackFrame *)sp;
-    }
 
-    MDS_CoreExceptionCallback();
-
-    for (;;) {
-    }
-}
-
-#else
-__attribute__((noreturn)) void Exception_Handler(uintptr_t sp)
-{
-    (void)(sp);
-
-    MDS_CoreExceptionCallback();
-
-    for (;;) {
-    }
-}
+        MDS_LOG_F("ra:%x mstatus:%x fcsr:%x tp:%x", g_exceptionContext->ra, g_exceptionContext->mstatus,
+                  g_exceptionContext->fcsr, g_exceptionContext->tp);
+        MDS_LOG_F("t0:%x t1:%x t2:%x s0_fp:%x s1:%x", g_exceptionContext->t0, g_exceptionContext->t1,
+                  g_exceptionContext->t2, g_exceptionContext->s0_fp, g_exceptionContext->s1);
+        MDS_LOG_F("a0:%x a1:%x a2:%x a3:%x a4:%x a5:%x", g_exceptionContext->a0, g_exceptionContext->a1,
+                  g_exceptionContext->a2, g_exceptionContext->a3, g_exceptionContext->a4, g_exceptionContext->a5);
+#ifndef __riscv_32e
+        MDS_LOG_F("a6:%x a7:%x s2:%x s3:%x s4:%x s5:%x", g_exceptionContext->a6, g_exceptionContext->a7,
+                  g_exceptionContext->s2, g_exceptionContext->s3, g_exceptionContext->s4, g_exceptionContext->s5);
+        MDS_LOG_F("s6:%x s7:%x s8:%x s9:%x s10:%x s11:%x", g_exceptionContext->s6, g_exceptionContext->s7,
+                  g_exceptionContext->s8, g_exceptionContext->s9, g_exceptionContext->s10, g_exceptionContext->s11);
+        MDS_LOG_F("t3:%x t4:%x t5:%x t6:%x", g_exceptionContext->t3, g_exceptionContext->t4, g_exceptionContext->t5,
+                  g_exceptionContext->t6);
 #endif
 
+        CORE_ExceptionBacktrace(mcause, mscratch, sp);
+    }
+
+    MDS_CoreExceptionCallback(true);
+
+    for (;;) {
+    }
+}
+
 /* Trap -------------------------------------------------------------------- */
-#if (defined(MDS_THREAD_PRIORITY_NUMS) && (MDS_THREAD_PRIORITY_NUMS > 0))
 __attribute__((weak)) void Interrupt_Handler(uintptr_t cause)
 {
     UNUSED(cause);
@@ -578,25 +630,26 @@ __attribute__((naked, __aligned__(0x04))) void Trap_Handler(void)
 {
     ContextStackSave();
 
-    register intptr_t mcause, mscratch;
+    register intptr_t mcause, mscratch, sp;
     __asm volatile("csrr        %0, mcause" : "=r"(mcause));
     __asm volatile("csrr        %0, mscratch" : "=r"(mscratch));
+    __asm volatile("mv          %0, sp");
+
     if (mscratch != 0) {
         __asm volatile("csrrw       sp, mscratch, sp");
     }
 
-    MDS_HOOK_CALL(INTERRUPT_ENTER, mcause);
     if ((mcause & MCAUSE_INT) == 0U) {
-        Exception_Handler(mscratch);
+        Exception_Handler(mcause, mscratch, sp);
     } else {
         Interrupt_Handler(mcause & MCAUSE_CAUSE);
     }
-    MDS_HOOK_CALL(INTERRUPT_EXIT, mcause);
 
     if (mscratch != 0) {
         __asm volatile("csrrw       sp, mscratch, sp");
     }
 
+#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX > 0))
     if (g_coreScheduler.swflag) {
         g_coreScheduler.swflag = false;
 
@@ -604,7 +657,7 @@ __attribute__((naked, __aligned__(0x04))) void Trap_Handler(void)
 
         __asm volatile(LOAD "       sp, (%0)" : : "r"(g_coreScheduler.toSP));
     }
+#endif
 
     __asm volatile("j           %0" : : "i"(ContextStackExit));
 }
-#endif

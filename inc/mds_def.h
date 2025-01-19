@@ -87,63 +87,6 @@ typedef enum MDS_Err {
 #define VALUE_ALIGN(val, align) ((val) & (~((align) - (1ULL))))
 #endif
 
-/* Data -------------------------------------------------------------------- */
-static inline uint16_t MDS_GetU16BE(const uint8_t *array)
-{
-    return ((uint16_t)((((uint16_t)(array[0x00])) << (MDS_BITS_OF_BYTE * 0x01)) |
-                       (((uint16_t)(array[0x01])) << (MDS_BITS_OF_BYTE * 0x00))));
-}
-
-static inline void MDS_PutU16BE(uint8_t *array, uint16_t value)
-{
-    array[0x00] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x01));
-    array[0x01] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x00));
-}
-
-static inline uint16_t MDS_GetU16LE(const uint8_t *array)
-{
-    return ((uint16_t)((((uint16_t)(array[0x00])) << (MDS_BITS_OF_BYTE * 0x00)) |
-                       (((uint16_t)(array[0x01])) << (MDS_BITS_OF_BYTE * 0x01))));
-}
-
-static inline void MDS_PutU16LE(uint8_t *array, uint16_t value)
-{
-    array[0x00] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x00));
-    array[0x01] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x01));
-}
-
-static inline uint32_t MDS_GetU32BE(const uint8_t *array)
-{
-    return ((uint32_t)((((uint32_t)(array[0x00])) << (MDS_BITS_OF_BYTE * 0x03)) |
-                       (((uint32_t)(array[0x01])) << (MDS_BITS_OF_BYTE * 0x02)) |
-                       (((uint32_t)(array[0x02])) << (MDS_BITS_OF_BYTE * 0x01)) |
-                       (((uint32_t)(array[0x03])) << (MDS_BITS_OF_BYTE * 0x00))));
-}
-
-static inline void MDS_PutU32BE(uint8_t *array, uint32_t value)
-{
-    array[0x00] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x03));
-    array[0x01] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x02));
-    array[0x02] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x01));
-    array[0x03] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x00));
-}
-
-static inline uint32_t MDS_GetU32LE(const uint8_t *array)
-{
-    return ((uint32_t)((((uint32_t)(array[0x00])) << (MDS_BITS_OF_BYTE * 0x00)) |
-                       (((uint32_t)(array[0x01])) << (MDS_BITS_OF_BYTE * 0x01)) |
-                       (((uint32_t)(array[0x02])) << (MDS_BITS_OF_BYTE * 0x02)) |
-                       (((uint32_t)(array[0x03])) << (MDS_BITS_OF_BYTE * 0x03))));
-}
-
-static inline void MDS_PutU32LE(uint8_t *array, uint32_t value)
-{
-    array[0x00] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x00));
-    array[0x01] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x01));
-    array[0x02] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x02));
-    array[0x03] = (uint8_t)(value >> (MDS_BITS_OF_BYTE * 0x03));
-}
-
 /* Linked List ------------------------------------------------------------- */
 typedef struct MDS_ListNode {
     struct MDS_ListNode *prev, *next;
