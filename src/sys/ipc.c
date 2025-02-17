@@ -11,7 +11,6 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "kernel.h"
-#include "mds_log.h"
 
 /* Hook -------------------------------------------------------------------- */
 MDS_HOOK_INIT(SEMAPHORE_TRY_ACQUIRE, MDS_Semaphore_t *semaphore, MDS_Tick_t timeout);

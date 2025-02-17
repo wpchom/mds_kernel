@@ -11,7 +11,6 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "kernel.h"
-#include "mds_log.h"
 
 /* Define ------------------------------------------------------------------ */
 #if (defined(MDS_SCHEDULER_DEBUG_ENABLE) && (MDS_SCHEDULER_DEBUG_ENABLE > 0))

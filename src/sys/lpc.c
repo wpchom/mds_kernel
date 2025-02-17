@@ -11,7 +11,6 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "mds_lpc.h"
-#include "mds_log.h"
 
 /* Typedef ----------------------------------------------------------------- */
 typedef struct MDS_LPC_Manager {
@@ -211,8 +210,6 @@ MDS_LPC_Run_t MDS_LPC_Init(const MDS_LPC_ManagerOps_t *ops, MDS_Tick_t threshold
 
     MDS_ConditionInit(&(g_lpcMgr.runCond), "lpc");
     MDS_MutexInit(&(g_lpcMgr.runMutex), "lpc");
-
-    LPC_RunModeSwitch(&g_lpcMgr);
 
     return (g_lpcMgr.runMode);
 }

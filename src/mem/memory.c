@@ -11,7 +11,6 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
-#include "mds_log.h"
 
 /* Function ---------------------------------------------------------------- */
 MDS_Err_t MDS_MemHeapInit(MDS_MemHeap_t *memheap, const char *name, void *base, size_t size,

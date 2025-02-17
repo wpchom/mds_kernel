@@ -14,6 +14,8 @@
 
 /* Include ----------------------------------------------------------------- */
 #include "mds_def.h"
+#include "mds_log.h"
+
 #ifdef MDS_CONFIG_FILE
 #include MDS_CONFIG_FILE
 #endif

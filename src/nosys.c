@@ -12,7 +12,6 @@
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
 #include "mds_lpc.h"
-#include "mds_log.h"
 
 /* Timer ------------------------------------------------------------------- */
 #ifndef MDS_KERNEL_TIMER_DISABLE

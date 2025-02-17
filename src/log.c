@@ -11,9 +11,12 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
-#include "mds_log.h"
 
 /* Define ------------------------------------------------------------------ */
+#ifndef MDS_LOG_PRINT_LEVEL
+#define MDS_LOG_PRINT_LEVEL MDS_LOG_LEVEL_INFO
+#endif
+
 #ifndef MDS_LOG_COMPRESS_MAGIC
 #define MDS_LOG_COMPRESS_MAGIC 0xD6 /* log 109 => 0x6D */
 #endif
@@ -24,10 +27,21 @@
 #endif
 
 /* Variable ---------------------------------------------------------------- */
+static size_t g_logPrintLevel = MDS_LOG_PRINT_LEVEL;
 static size_t g_logCompressPsn = 0;
 static void (*g_logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap) = NULL;
 
 /* Function ---------------------------------------------------------------- */
+size_t MDS_LOG_GetPrintLevel(void)
+{
+    return (g_logPrintLevel);
+}
+
+void MDS_LOG_SetPrintLevel(size_t level)
+{
+    g_logPrintLevel = level;
+}
+
 size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, va_list ap)
 {
     if (log == NULL) {
@@ -83,6 +97,10 @@ __attribute__((weak)) void MDS_LOG_VaPrintf(size_t level, const void *fmt, size_
 void MDS_LOG_Printf(size_t level, const void *fmt, size_t cnt, ...)
 {
     va_list ap;
+
+    if (level > g_logPrintLevel) {
+        return;
+    }
 
     va_start(ap, cnt);
     MDS_LOG_VaPrintf(level, fmt, cnt, ap);

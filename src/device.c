@@ -11,7 +11,6 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "mds_dev.h"
-#include "mds_log.h"
 
 /* Define ------------------------------------------------------------------ */
 #if (defined(MDS_DEVICE_DEBUG_ENABLE) && (MDS_DEVICE_DEBUG_ENABLE > 0))
