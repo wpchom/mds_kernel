@@ -66,6 +66,8 @@ extern size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, co
 extern size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, ...);
 
 /* Log ---------------------------------------------------------------------- */
+extern size_t MDS_LOG_GetPrintLevel(void);
+extern void MDS_LOG_SetPrintLevel(size_t level);
 extern void MDS_LOG_Register(void (*logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap));
 extern void MDS_LOG_VaPrintf(size_t level, const void *fmt, size_t cnt, va_list ap);
 extern void MDS_LOG_Printf(size_t level, const void *fmt, size_t cnt, ...);

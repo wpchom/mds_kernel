@@ -98,7 +98,7 @@ void MDS_LOG_Printf(size_t level, const void *fmt, size_t cnt, ...)
 {
     va_list ap;
 
-    if (level > g_logPrintLevel) {
+    if (level > MDS_LOG_GetPrintLevel()) {
         return;
     }
 
