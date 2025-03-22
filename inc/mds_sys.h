@@ -60,13 +60,13 @@ static inline void MDS_InitExport(void)
     }
 }
 
-/* Core --------------------------------------------------------------------- */
+/* Core -------------------------------------------------------------------- */
 extern void MDS_CoreIdleSleep(void);
 extern MDS_Item_t MDS_CoreInterruptCurrent(void);
 extern MDS_Item_t MDS_CoreInterruptLock(void);
 extern void MDS_CoreInterruptRestore(MDS_Item_t lock);
 
-/* Clock -------------------------------------------------------------------- */
+/* Clock ------------------------------------------------------------------- */
 #ifndef MDS_CLOCK_TICK_FREQ_HZ
 #define MDS_CLOCK_TICK_FREQ_HZ 1000U
 #endif
@@ -111,7 +111,7 @@ static inline void MDS_ClockDelayCount(MDS_Tick_t delay)
     }
 }
 
-/* SysMem ------------------------------------------------------------------- */
+/* SysMem ------------------------------------------------------------------ */
 #ifndef MDS_SYSMEM_ALIGN_SIZE
 #define MDS_SYSMEM_ALIGN_SIZE sizeof(uintptr_t)
 #endif
@@ -121,7 +121,7 @@ extern void *MDS_SysMemCalloc(size_t nmemb, size_t size);
 extern void *MDS_SysMemRealloc(void *ptr, size_t size);
 extern void MDS_SysMemFree(void *ptr);
 
-/* Object -------------------------------------------------------------------- */
+/* Object ------------------------------------------------------------------ */
 #ifndef MDS_OBJECT_NAME_SIZE
 #define MDS_OBJECT_NAME_SIZE 7
 #endif
@@ -406,7 +406,7 @@ extern size_t MDS_MsgQueueGetMsgSize(const MDS_MsgQueue_t *msgQueue);
 extern size_t MDS_MsgQueueGetMsgCount(const MDS_MsgQueue_t *msgQueue);
 extern size_t MDS_MsgQueueGetMsgFree(const MDS_MsgQueue_t *msgQueue);
 
-/* MemPool --------------------------------------------------------------- */
+/* MemPool ----------------------------------------------------------------- */
 struct MDS_MemPool {
     MDS_Object_t object;
     MDS_ListNode_t list;

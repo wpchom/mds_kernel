@@ -1,30 +1,33 @@
 declare_args() {
+  # config_file
+  mds_config_file = ""
+
   # log
   mds_log_build_level = "MDS_LOG_LEVEL_INFO"
+  mds_log_print_level = "MDS_LOG_LEVEL_INFO"
+  mds_log_assert_enable = false
   mds_log_compress_args_nums = 7
-  mds_assert_enable = false
 
   # lib
   mds_library_miniable = false
 
-  # tick
+  # obj
+  mds_object_name_size = 7
+
+  # clock
   mds_clock_tick_freq_hz = 1000
 
   # core
-  mds_core_arch = ""
+  mds_core_architecture = ""
   mds_core_backtrace_depth = 16
-
-  # obj
-  mds_object_name_size = 7
 
   # kernel
   mds_kernel_thread_priority_max = 32
   mds_kernel_hook_enable = false
   mds_kernel_stats_enable = false
-  mds_kernel_timer_disable = false
 
   #timer
-  mds_timer_thread_enable = false
+  mds_timer_independent = true
   mds_timer_thread_priority = 0
   mds_timer_thread_stacksize = 256
   mds_timer_thread_ticks = 16
@@ -32,11 +35,15 @@ declare_args() {
   # idle
   mds_idle_thread_stacksize = 384
   mds_idle_thread_ticks = 16
-  mds_idle_lpc_enable = false
 }
 
 config("mds_kernel_config") {
   include_dirs = [ "inc/" ]
+  defines = []
+
+  if (defined(mds_config_file) && mds_config_file != "") {
+    defines += [ "MDS_CONFIG_FILE=\"${mds_config_file}\"" ]
+  }
 
   assert(mds_log_build_level == "MDS_LOG_LEVEL_OFF" ||
          mds_log_build_level == "MDS_LOG_LEVEL_TRACK" ||
@@ -46,11 +53,13 @@ config("mds_kernel_config") {
          mds_log_build_level == "MDS_LOG_LEVEL_INFO" ||
          mds_log_build_level == "MDS_LOG_LEVEL_DEBUG" ||
          mds_log_build_level == "MDS_LOG_LEVEL_TRACE")
-  defines = [ "MDS_LOG_BUILD_LEVEL=${mds_log_build_level}" ]
+  defines += [ "MDS_LOG_BUILD_LEVEL=${mds_log_build_level}" ]
 
-  if (defined(mds_assert_enable) && mds_assert_enable) {
-    defines += [ "MDS_ASSERT_ENABLE=1" ]
+  if (defined(mds_log_assert_enable) && mds_log_assert_enable) {
+    defines += [ "MDS_LOG_ASSERT_ENABLE=1" ]
   }
+
+  defines += [ "MDS_LOG_COMPRESS_ARGS_NUMS=${mds_log_compress_args_nums}" ]
 
   if (defined(mds_clock_tick_freq_hz)) {
     assert(mds_clock_tick_freq_hz > 0)
@@ -86,11 +95,32 @@ static_library("mds_kernel") {
     "src/object.c",
   ]
 
+  assert(mds_log_print_level == "MDS_LOG_LEVEL_OFF" ||
+         mds_log_print_level == "MDS_LOG_LEVEL_TRACK" ||
+         mds_log_print_level == "MDS_LOG_LEVEL_FATAL" ||
+         mds_log_print_level == "MDS_LOG_LEVEL_ERROR" ||
+         mds_log_print_level == "MDS_LOG_LEVEL_WARN" ||
+         mds_log_print_level == "MDS_LOG_LEVEL_INFO" ||
+         mds_log_print_level == "MDS_LOG_LEVEL_DEBUG" ||
+         mds_log_print_level == "MDS_LOG_LEVEL_TRACE")
+  defines += [ "MDS_LOG_PRINT_LEVEL=${mds_log_print_level}" ]
+
+  if (defined(mds_library_miniable) && mds_library_miniable) {
+    defines += [ "MDS_LIBRARY_MINIABLE=1" ]
+  }
+
+  if (defined(mds_core_architecture) && mds_core_architecture != "") {
+    sources += [ "src/arch/" + mds_core_architecture + ".c" ]
+    if (defined(mds_core_backtrace_depth)) {
+      defines += [ "MDS_CORE_BACKTRACE_DEPTH=${mds_core_backtrace_depth}" ]
+    }
+  }
+
   if (mds_kernel_thread_priority_max == 0) {
     sources += [ "src/nosys.c" ]
 
-    if (defined(mds_kernel_timer_disable) && mds_kernel_timer_disable) {
-      defines += [ "MDS_KERNEL_TIMER_DISABLE=1" ]
+    if (defined(mds_timer_independent) && mds_timer_independent) {
+      defines += [ "MDS_TIMER_INDEPENDENT=1" ]
     }
   } else {
     sources += [
@@ -98,19 +128,16 @@ static_library("mds_kernel") {
       "src/sys/idle.c",
       "src/sys/ipc.c",
       "src/sys/kernel.c",
-      "src/sys/lpc.c",
       "src/sys/scheduler.c",
       "src/sys/thread.c",
       "src/sys/timer.c",
     ]
 
-    assert(mds_kernel_timer_disable == false,
-           "timer should be enabled with thread")
-
-    if (defined(mds_timer_thread_eanble) && mds_timer_thread_eanble) {
+    if (defined(mds_timer_independent) && mds_timer_independent) {
       defines += [ "MDS_TIMER_THREAD_ENABLE=1" ]
     }
     if (defined(mds_timer_thread_priority)) {
+      assert(mds_timer_thread_priority < mds_kernel_thread_priority_max)
       defines += [ "MDS_TIMER_THREAD_PRIORITY=${mds_timer_thread_priority}" ]
     }
     if (defined(mds_timer_thread_stacksize)) {
@@ -130,29 +157,12 @@ static_library("mds_kernel") {
       assert(mds_idle_thread_ticks > 0)
       defines += [ "MDS_IDLE_THREAD_TICKS=${mds_idle_thread_ticks}" ]
     }
-    if (defined(mds_idle_lpc_enable) && mds_idle_lpc_enable) {
-      defines += [ "MDS_IDLE_LPC_ENABLE=1" ]
-    }
   }
 
   sources += [
     "src/mem/llff.c",
     "src/mem/memory.c",
   ]
-
-  if (defined(mds_core_arch) && mds_core_arch != "") {
-    sources += [ "src/arch/" + mds_core_arch + ".c" ]
-  } else {
-    sources += [ "src/arch/default/default.c" ]
-  }
-
-  if (defined(mds_library_miniable) && mds_library_miniable) {
-    defines += [ "MDS_LIBRARY_MINIABLE=1" ]
-  }
-
-  if (defined(mds_core_backtrace_depth)) {
-    defines += [ "MDS_CORE_BACKTRACE_DEPTH=${mds_core_backtrace_depth}" ]
-  }
 
   public_configs = [ ":mds_kernel_config" ]
 }

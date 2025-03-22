@@ -38,7 +38,6 @@ extern MDS_Thread_t *MDS_KernelPopDefunct(void);
 extern void MDS_KernelRemainThread(void);
 extern MDS_Thread_t *MDS_KernelIdleThread(void);
 extern void MDS_IdleThreadInit(void);
-extern void MDS_IdleLowPowerControl(void);
 
 /* Timer ------------------------------------------------------------------- */
 extern void MDS_SysTimerInit(void);

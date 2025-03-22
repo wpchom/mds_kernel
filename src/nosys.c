@@ -11,10 +11,9 @@
  **/
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
-#include "mds_lpc.h"
 
 /* Timer ------------------------------------------------------------------- */
-#ifndef MDS_KERNEL_TIMER_DISABLE
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
 static MDS_ListNode_t g_sysTimerSkipList[MDS_TIMER_SKIPLIST_LEVEL];
 
 static int TIMER_SkipListCompare(const MDS_ListNode_t *node, const void *value)
@@ -145,11 +144,12 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Tick_t timeout)
             timer->tickstart = MDS_ClockGetTickCount();
             timer->ticklimit = timer->tickstart + timeout;
 
-            MDS_ListNode_t *skipList = MDS_SkipListSearchNode(timerList, ARRAY_SIZE(timer->node), &(timer->ticklimit),
-                                                              TIMER_SkipListCompare);
+            MDS_ListNode_t *skipNode[ARRAY_SIZE(timer->node)];
+            MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node), &(timer->ticklimit),
+                                   TIMER_SkipListCompare);
 
             skipRand = skipRand + timer->tickstart + 1;
-            MDS_SkipListInsertNode(skipList, timer->node, ARRAY_SIZE(timer->node), skipRand, MDS_TIMER_SKIPLIST_SHIFT);
+            MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand, MDS_TIMER_SKIPLIST_SHIFT);
             timer->flags |= MDS_TIMER_FLAG_ACTIVED;
         }
 
@@ -191,14 +191,14 @@ bool MDS_TimerIsActived(const MDS_Timer_t *timer)
 
 void MDS_SysTimerInit(void)
 {
-#ifndef MDS_KERNEL_TIMER_DISABLE
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
     MDS_SkipListInitNode(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 #endif
 }
 
 void MDS_SysTimerCheck(void)
 {
-#ifndef MDS_KERNEL_TIMER_DISABLE
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
     TIMER_Check(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 #endif
 }
@@ -207,7 +207,7 @@ MDS_Tick_t MDS_SysTimerNextTick(void)
 {
     MDS_Tick_t ticknext = MDS_CLOCK_TICK_FOREVER;
 
-#ifndef MDS_KERNEL_TIMER_DISABLE
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
     MDS_Timer_t *timer = TIMER_NextTickoutTimer(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
     if (timer != NULL) {
         ticknext = timer->ticklimit;
@@ -626,45 +626,4 @@ void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
 
     g_unixTimeBase = ts - MDS_ClockTickToMs(ticks);
     g_unixTimeZone = tz;
-}
-
-/* LowPowerControl --------------------------------------------------------- */
-typedef struct MDS_LPC_Manager {
-    const MDS_LPC_ManagerOps_t *ops;
-    MDS_Tick_t sleepThreshold;
-    MDS_LPC_Sleep_t sleepDefault : 8;
-    MDS_LPC_Run_t runDefault     : 8;
-    MDS_LPC_Run_t runMode        : 8;
-} MDS_LPC_Manager_t;
-
-static MDS_ListNode_t g_lpcDevList = {.next = &g_lpcDevList, .prev = &g_lpcDevList};
-static MDS_LPC_Manager_t g_lpcMgr;
-
-MDS_LPC_Run_t MDS_LPC_Init(const MDS_LPC_ManagerOps_t *ops, MDS_Tick_t threshold, MDS_LPC_Sleep_t sleep,
-                           MDS_LPC_Run_t run)
-{
-    g_lpcMgr.ops = ops;
-    g_lpcMgr.sleepThreshold = threshold;
-    g_lpcMgr.sleepDefault = sleep;
-    g_lpcMgr.runDefault = run;
-
-    // LPC_RunModeSwitch(&g_lpcMgr);
-
-    return (g_lpcMgr.runMode);
-}
-
-MDS_Err_t MDS_LPC_DeviceRegister(MDS_LPC_Device_t *device, MDS_Arg_t *dev, const MDS_LPC_DeviceOps_t *ops)
-{
-    MDS_ASSERT(device != NULL);
-
-    MDS_ListInitNode(&(device->node));
-    device->dev = dev;
-    device->ops = ops;
-    MDS_ListInsertNodeNext(&g_lpcDevList, &(device->node));
-
-    if ((device->ops != NULL) && (device->ops->resume != NULL)) {
-        device->ops->resume(device->dev, g_lpcMgr.runMode);
-    }
-
-    return (MDS_EOK);
 }

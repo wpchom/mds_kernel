@@ -41,44 +41,49 @@ bool MDS_SkipListIsEmpty(MDS_ListNode_t node[], size_t size)
     return (MDS_ListIsEmpty(&(node[0])));
 }
 
-MDS_ListNode_t *MDS_SkipListSearchNode(MDS_ListNode_t list[], size_t size, const void *value,
+MDS_ListNode_t *MDS_SkipListSearchNode(MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size, const void *value,
                                        int (*compare)(const MDS_ListNode_t *node, const void *value))
 {
+    MDS_ASSERT(last != NULL);
     MDS_ASSERT(list != NULL);
     MDS_ASSERT(size > 0);
     MDS_ASSERT(compare != NULL);
-
     MDS_ListNode_t *skip = list;
 
     for (size_t level = 0; level < size; level++) {
-        for (; skip != list[level].prev; skip = skip->next) {
+        for (; skip->next != &(list[level]); skip = skip->next) {
             const MDS_ListNode_t *node = skip->next - level;
             if (compare(node, value) > 0) {
                 break;
             }
+        }
+        if (last != NULL) {
+            last[level] = skip;
         }
         if (level != (size - 1)) {
             skip = skip + 1;
         }
     }
 
-    return (skip - size + 1);
+    skip = skip - size + 1;
+
+    return ((skip != &(list[0])) ? (skip) : (NULL));
 }
 
-size_t MDS_SkipListInsertNode(MDS_ListNode_t skip[], MDS_ListNode_t node[], size_t size, size_t rand, size_t shift)
+size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size, size_t rand, size_t shift)
 {
-    MDS_ASSERT(skip != NULL);
+    MDS_ASSERT(last != NULL);
     MDS_ASSERT(node != NULL);
     MDS_ASSERT(size > 0);
 
     size_t level = 1;
 
     do {
-        MDS_ListInsertNodeNext(&(skip[size - level]), &(node[size - level]));
+        MDS_ListInsertNodeNext(last[size - level], &(node[size - level]));
         rand >>= shift;
     } while ((++level <= size) && !(rand & ((1UL << shift) - 1U)));
 
-    return (level);
+    return (level - 1);
 }
 
 /* Tree -------------------------------------------------------------------- */

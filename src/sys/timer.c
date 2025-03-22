@@ -240,11 +240,12 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Tick_t timeout)
 
             MDS_HOOK_CALL(TIMER_START, timer);
 
-            MDS_ListNode_t *skipList = MDS_SkipListSearchNode(timerList, ARRAY_SIZE(timer->node), &(timer->ticklimit),
-                                                              TIMER_SkipListCompare);
+            MDS_ListNode_t *skipNode[ARRAY_SIZE(timer->node)];
+            MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node), &(timer->ticklimit),
+                                   TIMER_SkipListCompare);
 
             skipRand = skipRand + timer->tickstart + 1;
-            MDS_SkipListInsertNode(skipList, timer->node, ARRAY_SIZE(timer->node), skipRand, MDS_TIMER_SKIPLIST_SHIFT);
+            MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand, MDS_TIMER_SKIPLIST_SHIFT);
             timer->flags |= MDS_TIMER_FLAG_ACTIVED;
 
 #if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE > 0))

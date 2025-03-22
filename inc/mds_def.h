@@ -150,9 +150,10 @@ static inline size_t MDS_ListGetLength(const MDS_ListNode_t *list)
 extern void MDS_SkipListInitNode(MDS_ListNode_t node[], size_t size);
 extern void MDS_SkipListRemoveNode(MDS_ListNode_t node[], size_t size);
 extern bool MDS_SkipListIsEmpty(MDS_ListNode_t node[], size_t size);
-extern MDS_ListNode_t *MDS_SkipListSearchNode(MDS_ListNode_t list[], size_t size, const void *value,
+extern MDS_ListNode_t *MDS_SkipListSearchNode(MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size,
+                                              const void *value,
                                               int (*compare)(const MDS_ListNode_t *node, const void *value));
-extern size_t MDS_SkipListInsertNode(MDS_ListNode_t skip[], MDS_ListNode_t node[], size_t size, size_t rand,
+extern size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size, size_t rand,
                                      size_t shift);
 
 /* Tree -------------------------------------------------------------------- */

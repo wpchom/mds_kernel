@@ -26,6 +26,11 @@ static MDS_Thread_t g_idleThread;
 static uint8_t g_idleStack[MDS_IDLE_THREAD_STACKSIZE];
 
 /* Function ---------------------------------------------------------------- */
+__attribute__((weak)) void MDS_IdleLowPowerControl(void)
+{
+    MDS_CoreIdleSleep();
+}
+
 MDS_Thread_t *MDS_KernelIdleThread(void)
 {
     return (&g_idleThread);
@@ -106,11 +111,7 @@ static __attribute__((noreturn)) void IDLE_ThreadEntry(MDS_Arg_t *arg)
         }
 #endif
 
-#if (defined(MDS_IDLE_LPC_ENABLE) && (MDS_IDLE_LPC_ENABLE > 0))
         MDS_IdleLowPowerControl();
-#else
-        MDS_CoreIdleSleep();
-#endif
     }
 }
 
