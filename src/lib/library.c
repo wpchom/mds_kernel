@@ -365,6 +365,75 @@ static unsigned char MDS_StrChar2Hex(const char ch)
     return ((unsigned char)(-1));
 }
 
+size_t MDS_Strnlen(const char *str, size_t maxlen)
+{
+    const char *ch = str;
+
+    while ((maxlen != 0) && (*ch != '\0')) {
+        ch++;
+        maxlen--;
+    }
+
+    return ((size_t)(ch - str));
+}
+
+size_t MDS_Strlen(const char *str)
+{
+    const char *ch = str;
+
+    while (*ch != '\0') {
+        ch++;
+    }
+
+    return (ch - str);
+}
+
+size_t MDS_Strlcpy(char *dst, const char *src, size_t dsize)
+{
+    const char *osrc = src;
+
+    while ((dsize > 1) && (*src != '\0')) {
+        *dst++ = *src++;
+        dsize--;
+    }
+
+    while (*src != '\0') {
+        src++;
+    }
+
+    if (dsize > 0) {
+        *dst = '\0';
+    }
+
+    return (src - osrc);
+}
+
+size_t MDS_Strlcat(char *dst, const char *src, size_t dsize)
+{
+    size_t dlen;
+    const char *odst = dst;
+    const char *osrc = src;
+
+    while ((dsize > 0) && (*dst != '\0')) {
+        dst++;
+        dsize--;
+    }
+    dlen = dst - odst;
+
+    for (odst = dst; *src != '\0'; src++) {
+        if (dsize > 1) {
+            *dst++ = *src;
+            dsize--;
+        }
+    }
+
+    if (dst != odst) {
+        *dst = '\0';
+    }
+
+    return (dlen + (src - osrc));
+}
+
 unsigned long long MDS_Strtoull(const char *str, char **context, int base)
 {
     unsigned long long value = 0;
@@ -425,7 +494,6 @@ enum FMT_FormatFlag {
     FMT_FLAG_UPCASE = 0x0400U,
     FMT_FLAG_NEGATIVE = 0x0800U,
     FMT_FLAG_IGNORE = 0x1000U,
-    FMT_FLAG_SECURE = 0x8000U,
 };
 
 typedef struct FMT_Args {
@@ -468,33 +536,6 @@ static const char *FMT_ParsePrintFormatFlags(const char *fmt, va_list *ap, FMT_A
         args->flags |= (*++fmt == 'h') ? (fmt++, FMT_FLAG_SHORT | FMT_FLAG_CHAR) : (FMT_FLAG_SHORT);
     } else if (*fmt == 'X') {
         args->flags |= FMT_FLAG_UPCASE;
-    }
-
-    return (fmt);
-}
-
-static const char *FMT_ParseScanfFormatFlags(const char *fmt, FMT_Args_t *args, bool secure)
-{
-    args->flags = 0U;
-    for (; *fmt != '\0'; fmt++) {
-        if (*fmt == '*') {
-            args->flags |= FMT_FLAG_IGNORE;
-        } else {
-            break;
-        }
-    }
-
-    int width = MDS_Strtol(fmt, (char **)(&fmt), MDS_NUM_DEC_BASE);
-    args->width = (width > 0) ? (width) : (0);
-
-    if (*fmt == 'l') {
-        args->flags |= (*++fmt == 'l') ? (fmt++, FMT_FLAG_LONG_LONG | FMT_FLAG_LONG) : (FMT_FLAG_LONG);
-    } else if (*fmt == 'h') {
-        args->flags |= (*++fmt == 'h') ? (fmt++, FMT_FLAG_SHORT | FMT_FLAG_CHAR) : (FMT_FLAG_SHORT);
-    }
-
-    if (secure) {
-        args->flags |= FMT_FLAG_SECURE;
     }
 
     return (fmt);
@@ -663,9 +704,9 @@ static void FMT_PrintString(char *buff, size_t size, size_t *pos, va_list *ap, F
     }
 
     if (args->precision > 0) {
-        len = strnlen(str, args->precision);
+        len = MDS_Strnlen(str, args->precision);
     } else {
-        len = strlen(str);
+        len = MDS_Strlen(str);
     }
 
     *pos = FMT_PrintBuff(buff, size, *pos, str, len, args);
@@ -700,7 +741,7 @@ static int FMT_VaParsePrint(char *buff, size_t size, size_t *pos, const char **f
     return (0);
 }
 
-int MDS_VaStringNPrintf(char *buff, size_t size, const char *fmt, va_list ap)
+int MDS_Vsnprintf(char *buff, size_t size, const char *fmt, va_list ap)
 {
     size_t pos;
     va_list acpy;
@@ -728,33 +769,56 @@ int MDS_VaStringNPrintf(char *buff, size_t size, const char *fmt, va_list ap)
     return (pos);
 }
 
-int MDS_StringNPrintf(char *buff, size_t size, const char *fmt, ...)
+int MDS_Snprintf(char *buff, size_t size, const char *fmt, ...)
 {
     int ret;
     va_list ap;
 
     va_start(ap, fmt);
-    ret = MDS_VaStringNPrintf(buff, size, fmt, ap);
+    ret = MDS_Vsnprintf(buff, size, fmt, ap);
     va_end(ap);
 
     return (ret);
 }
 
-int MDS_VaStringPrintf(char *buff, const char *fmt, va_list ap)
+int MDS_Vsprintf(char *buff, const char *fmt, va_list ap)
 {
-    return (MDS_VaStringNPrintf(buff, __SIZE_MAX__, fmt, ap));
+    return (MDS_Vsnprintf(buff, __SIZE_MAX__, fmt, ap));
 }
 
-int MDS_StringPrintf(char *buff, const char *fmt, ...)
+int MDS_Sprintf(char *buff, const char *fmt, ...)
 {
     int ret;
     va_list ap;
 
     va_start(ap, fmt);
-    ret = MDS_VaStringNPrintf(buff, __SIZE_MAX__, fmt, ap);
+    ret = MDS_Vsnprintf(buff, __SIZE_MAX__, fmt, ap);
     va_end(ap);
 
     return (ret);
+}
+
+static const char *FMT_ParseScanfFormatFlags(const char *fmt, FMT_Args_t *args)
+{
+    args->flags = 0U;
+    for (; *fmt != '\0'; fmt++) {
+        if (*fmt == '*') {
+            args->flags |= FMT_FLAG_IGNORE;
+        } else {
+            break;
+        }
+    }
+
+    int width = MDS_Strtol(fmt, (char **)(&fmt), MDS_NUM_DEC_BASE);
+    args->width = (width > 0) ? (width) : (0);
+
+    if (*fmt == 'l') {
+        args->flags |= (*++fmt == 'l') ? (fmt++, FMT_FLAG_LONG_LONG | FMT_FLAG_LONG) : (FMT_FLAG_LONG);
+    } else if (*fmt == 'h') {
+        args->flags |= (*++fmt == 'h') ? (fmt++, FMT_FLAG_SHORT | FMT_FLAG_CHAR) : (FMT_FLAG_SHORT);
+    }
+
+    return (fmt);
 }
 
 static bool FMT_IsSpace(const char ch)
@@ -801,24 +865,22 @@ static const char *FMT_ScanInteger(const char *buff, va_list *ap, FMT_Args_t *ar
 static const char *FMT_ScanChar(const char *buff, const char ch, va_list *ap, FMT_Args_t *args)
 {
     char *pch = NULL;
-    size_t size = 0;
-    size_t len = (args->width <= 0) ? (sizeof(char)) : (args->width);
     size_t idx = 0;
+    size_t size = (args->width <= 0) ? (sizeof(char)) : (args->width);
 
     if ((args->flags & FMT_FLAG_IGNORE) == 0U) {
         pch = va_arg(*ap, char *);
-        size = ((args->flags & FMT_FLAG_SECURE) != 0U) ? ((size_t)va_arg(*ap, int)) : (len);
     }
 
-    if (size > 0) {
-        while ((*buff != '\0') && (idx < len) && (idx < size)) {
+    if (pch != NULL) {
+        while ((*buff != '\0') && (idx < size)) {
             pch[idx++] = *buff++;
             if (*buff == ch) {
                 break;
             }
         }
     } else {
-        while ((*buff != '\0') && (idx < len) && (idx < size)) {
+        while ((*buff != '\0') && (idx < size)) {
             idx++;
             buff++;
             if (*buff == ch) {
@@ -833,16 +895,14 @@ static const char *FMT_ScanChar(const char *buff, const char ch, va_list *ap, FM
 static const char *FMT_ScanString(const char *buff, const char ch, va_list *ap, FMT_Args_t *args)
 {
     char *pch = NULL;
-    size_t size = 0;
     size_t idx = 0;
+    size_t size = (args->width > 0) ? (args->width) : (__SIZE_MAX__);
 
     if ((args->flags & FMT_FLAG_IGNORE) == 0U) {
         pch = va_arg(*ap, char *);
-        size = ((args->flags & FMT_FLAG_SECURE) != 0U) ? ((size_t)va_arg(*ap, int)) : (__SIZE_MAX__);
     }
 
-    if (size > 0) {
-        size = ((0 < args->width) && (args->width < (size - 1))) ? (args->width) : (size);
+    if (pch != NULL) {
         while ((*buff != '\0') && (!FMT_IsSpace(*buff)) && ((idx + 1) < size)) {
             pch[idx++] = *buff++;
             if (*buff == ch) {
@@ -851,22 +911,21 @@ static const char *FMT_ScanString(const char *buff, const char ch, va_list *ap, 
         }
         pch[idx] = '\0';
     } else {
-        buff++;
-    }
-
-    while ((*buff != '\0') && (*buff != ch) && (!FMT_IsSpace(*buff))) {
-        buff++;
+        while ((*buff != '\0') && (!FMT_IsSpace(*buff)) && (idx < size)) {
+            idx++;
+            buff++;
+        }
     }
 
     return (buff);
 }
 
-static const char *FMT_ParseScan(const char *buff, const char **fmt, va_list *ap, bool secure)
+static const char *FMT_ParseScan(const char *buff, const char **fmt, va_list *ap)
 {
     char ch;
     FMT_Args_t args = {0};
 
-    *fmt = FMT_ParseScanfFormatFlags(*fmt, &args, secure);
+    *fmt = FMT_ParseScanfFormatFlags(*fmt, &args);
     ch = (*fmt)[0];
     args.base = FMT_PrintIntegerBase(ch);
     if (args.base > 0) {
@@ -882,7 +941,7 @@ static const char *FMT_ParseScan(const char *buff, const char **fmt, va_list *ap
     return (buff);
 }
 
-static int FMT_VaStringScanf(const char *buff, const char *fmt, va_list ap, bool secure)
+static int FMT_VaStringScanf(const char *buff, const char *fmt, va_list ap)
 {
     if ((buff == NULL) || (fmt == NULL)) {
         return (0);
@@ -896,7 +955,7 @@ static int FMT_VaStringScanf(const char *buff, const char *fmt, va_list ap, bool
         if (*fmt == '%') {
             fmt++;
             va_copy(acpy, ap);
-            const char *tmp = FMT_ParseScan(buff, &fmt, &acpy, secure);
+            const char *tmp = FMT_ParseScan(buff, &fmt, &acpy);
             va_end(ap);
             va_copy(ap, acpy);
             if (tmp == buff) {
@@ -924,35 +983,18 @@ static int FMT_VaStringScanf(const char *buff, const char *fmt, va_list ap, bool
     return (ret);
 }
 
-int MDS_VaStringScanf(const char *buff, const char *fmt, va_list ap)
+int MDS_Vsscanf(const char *buff, const char *fmt, va_list ap)
 {
-    return (FMT_VaStringScanf(buff, fmt, ap, false));
+    return (FMT_VaStringScanf(buff, fmt, ap));
 }
 
-int MDS_StringScanf(const char *buff, const char *fmt, ...)
+int MDS_Sscanf(const char *buff, const char *fmt, ...)
 {
     int ret;
     va_list ap;
 
     va_start(ap, fmt);
-    ret = FMT_VaStringScanf(buff, fmt, ap, false);
-    va_end(ap);
-
-    return (ret);
-}
-
-int MDS_VaStringScanfS(const char *buff, const char *fmt, va_list ap)
-{
-    return (FMT_VaStringScanf(buff, fmt, ap, true));
-}
-
-int MDS_StringScanfS(const char *buff, const char *fmt, ...)
-{
-    int ret;
-    va_list ap;
-
-    va_start(ap, fmt);
-    ret = FMT_VaStringScanf(buff, fmt, ap, true);
+    ret = FMT_VaStringScanf(buff, fmt, ap);
     va_end(ap);
 
     return (ret);

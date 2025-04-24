@@ -14,12 +14,12 @@ declare_args() {
   # obj
   mds_object_name_size = 7
 
-  # clock
-  mds_clock_tick_freq_hz = 1000
-
   # core
   mds_core_architecture = ""
   mds_core_backtrace_depth = 16
+
+  # clock
+  mds_clock_tick_freq_hz = 1000
 
   # kernel
   mds_kernel_thread_priority_max = 32
@@ -45,6 +45,7 @@ config("mds_kernel_config") {
     defines += [ "MDS_CONFIG_FILE=\"${mds_config_file}\"" ]
   }
 
+  # log
   assert(mds_log_build_level == "MDS_LOG_LEVEL_OFF" ||
          mds_log_build_level == "MDS_LOG_LEVEL_TRACK" ||
          mds_log_build_level == "MDS_LOG_LEVEL_FATAL" ||
@@ -59,18 +60,21 @@ config("mds_kernel_config") {
     defines += [ "MDS_LOG_ASSERT_ENABLE=1" ]
   }
 
-  defines += [ "MDS_LOG_COMPRESS_ARGS_NUMS=${mds_log_compress_args_nums}" ]
+  # obj
+  defines += [ "MDS_OBJECT_NAME_SIZE=${mds_object_name_size}" ]
 
+  # core
+  if (defined(mds_core_backtrace_depth)) {
+    defines += [ "MDS_CORE_BACKTRACE_DEPTH=${mds_core_backtrace_depth}" ]
+  }
+
+  # clock
   if (defined(mds_clock_tick_freq_hz)) {
     assert(mds_clock_tick_freq_hz > 0)
     defines += [ "MDS_CLOCK_TICK_FREQ_HZ=${mds_clock_tick_freq_hz}" ]
   }
 
-  if (defined(mds_object_name_size)) {
-    assert(mds_object_name_size > 0)
-    defines += [ "MDS_OBJECT_NAME_SIZE=${mds_object_name_size}" ]
-  }
-
+  # sys
   if (defined(mds_kernel_thread_priority_max)) {
     defines +=
         [ "MDS_KERNEL_THREAD_PRIORITY_MAX=${mds_kernel_thread_priority_max}" ]
@@ -90,11 +94,11 @@ static_library("mds_kernel") {
 
   sources = [
     "src/device.c",
-    "src/library.c",
     "src/log.c",
     "src/object.c",
   ]
 
+  # log
   assert(mds_log_print_level == "MDS_LOG_LEVEL_OFF" ||
          mds_log_print_level == "MDS_LOG_LEVEL_TRACK" ||
          mds_log_print_level == "MDS_LOG_LEVEL_FATAL" ||
@@ -104,18 +108,20 @@ static_library("mds_kernel") {
          mds_log_print_level == "MDS_LOG_LEVEL_DEBUG" ||
          mds_log_print_level == "MDS_LOG_LEVEL_TRACE")
   defines += [ "MDS_LOG_PRINT_LEVEL=${mds_log_print_level}" ]
+  defines += [ "MDS_LOG_COMPRESS_ARGS_NUMS=${mds_log_compress_args_nums}" ]
 
+  # lib
+  sources += [ "src/lib/library.c" ]
   if (defined(mds_library_miniable) && mds_library_miniable) {
     defines += [ "MDS_LIBRARY_MINIABLE=1" ]
   }
 
+  # core
   if (defined(mds_core_architecture) && mds_core_architecture != "") {
-    sources += [ "src/arch/" + mds_core_architecture + ".c" ]
-    if (defined(mds_core_backtrace_depth)) {
-      defines += [ "MDS_CORE_BACKTRACE_DEPTH=${mds_core_backtrace_depth}" ]
-    }
+    sources += [ "src/core/" + mds_core_architecture + ".c" ]
   }
 
+  # sys
   if (mds_kernel_thread_priority_max == 0) {
     sources += [ "src/nosys.c" ]
 
@@ -159,10 +165,12 @@ static_library("mds_kernel") {
     }
   }
 
+  # mem
   sources += [
     "src/mem/llff.c",
     "src/mem/memory.c",
   ]
 
+  # config
   public_configs = [ ":mds_kernel_config" ]
 }

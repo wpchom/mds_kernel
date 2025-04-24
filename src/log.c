@@ -17,6 +17,10 @@
 #define MDS_LOG_PRINT_LEVEL MDS_LOG_LEVEL_INFO
 #endif
 
+#ifndef MDS_LOG_COMPRESS_ARGS_NUMS
+#define MDS_LOG_COMPRESS_ARGS_NUMS 7
+#endif
+
 #ifndef MDS_LOG_COMPRESS_MAGIC
 #define MDS_LOG_COMPRESS_MAGIC 0xD6 /* log 109 => 0x6D */
 #endif
@@ -40,46 +44,6 @@ size_t MDS_LOG_GetPrintLevel(void)
 void MDS_LOG_SetPrintLevel(size_t level)
 {
     g_logPrintLevel = level;
-}
-
-size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, va_list ap)
-{
-    if (log == NULL) {
-        return (0);
-    }
-
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-    g_logCompressPsn++;
-    MDS_CoreInterruptRestore(lock);
-
-    if (cnt > MDS_LOG_COMPRESS_ARGS_NUMS) {
-        cnt = MDS_LOG_COMPRESS_ARGS_NUMS;
-    }
-
-    log->magic = MDS_LOG_COMPRESS_MAGIC;
-    log->address = (uintptr_t)fmt & 0x00FFFFFF;
-    log->level = level;
-    log->count = cnt;
-    log->psn = g_logCompressPsn;
-    log->timestamp = MDS_ClockGetTimestamp(NULL);
-
-    for (size_t idx = 0; idx < cnt; idx++) {
-        uint32_t val = va_arg(ap, uint32_t);
-        log->args[idx] = MDS_LOG_COMPRESS_ARG_FIX(val);
-    }
-
-    return (sizeof(MDS_LOG_Compress_t) - (sizeof(uint32_t) * (MDS_LOG_COMPRESS_ARGS_NUMS + cnt)));
-}
-
-size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, ...)
-{
-    va_list ap;
-
-    va_start(ap, cnt);
-    size_t len = MDS_LOG_CompressStructVa(log, level, fmt, cnt, ap);
-    va_end(ap);
-
-    return (len);
 }
 
 void MDS_LOG_Register(void (*logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap))
@@ -134,4 +98,45 @@ __attribute__((noreturn)) void MDS_AssertPrintf(const char *assertion, const cha
 
     MDS_PanicPrintf("[ASSERT] '%s' in function:'%s' caller:%p,%p", assertion, function, caller,
                     __builtin_extract_return_addr(caller));
+}
+
+/* Compress ---------------------------------------------------------------- */
+size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, va_list ap)
+{
+    if (log == NULL) {
+        return (0);
+    }
+
+    MDS_Item_t lock = MDS_CoreInterruptLock();
+    g_logCompressPsn++;
+    MDS_CoreInterruptRestore(lock);
+
+    if (cnt > MDS_LOG_COMPRESS_ARGS_NUMS) {
+        cnt = MDS_LOG_COMPRESS_ARGS_NUMS;
+    }
+
+    log->magic = MDS_LOG_COMPRESS_MAGIC;
+    log->address = (uintptr_t)fmt & 0x00FFFFFF;
+    log->level = level;
+    log->count = cnt;
+    log->psn = g_logCompressPsn;
+    log->timestamp = MDS_ClockGetTimestamp(NULL);
+
+    for (size_t idx = 0; idx < cnt; idx++) {
+        uint32_t val = va_arg(ap, uint32_t);
+        log->args[idx] = MDS_LOG_COMPRESS_ARG_FIX(val);
+    }
+
+    return (sizeof(MDS_LOG_Compress_t) - (sizeof(uint32_t) * (MDS_LOG_COMPRESS_ARGS_NUMS + cnt)));
+}
+
+size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, ...)
+{
+    va_list ap;
+
+    va_start(ap, cnt);
+    size_t len = MDS_LOG_CompressStructVa(log, level, fmt, cnt, ap);
+    va_end(ap);
+
+    return (len);
 }

@@ -90,39 +90,38 @@ typedef struct MDS_DevDumpData {
 } MDS_DevDumpData_t;
 
 /* Function ---------------------------------------------------------------- */
-extern MDS_Device_t *MDS_DeviceFind(const char *name);
-extern void MDS_DeviceRegisterHook(const MDS_Device_t *device,
-                                   void (*hook)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd));
+MDS_Device_t *MDS_DeviceFind(const char *name);
+void MDS_DeviceRegisterHook(const MDS_Device_t *device, void (*hook)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd));
 
-extern MDS_Err_t MDS_DevModuleInit(MDS_DevModule_t *module, const char *name, const MDS_DevDriver_t *driver,
-                                   MDS_DevHandle_t *handle, const MDS_Arg_t *init);
-extern MDS_Err_t MDS_DevModuleDeInit(MDS_DevModule_t *module);
-extern MDS_DevModule_t *MDS_DevModuleCreate(size_t typesz, const char *name, const MDS_DevDriver_t *driver,
-                                            const MDS_Arg_t *init);
-extern MDS_Err_t MDS_DevModuleDestroy(MDS_DevModule_t *module);
+MDS_Err_t MDS_DevModuleInit(MDS_DevModule_t *module, const char *name, const MDS_DevDriver_t *driver,
+                            MDS_DevHandle_t *handle, const MDS_Arg_t *init);
+MDS_Err_t MDS_DevModuleDeInit(MDS_DevModule_t *module);
+MDS_DevModule_t *MDS_DevModuleCreate(size_t typesz, const char *name, const MDS_DevDriver_t *driver,
+                                     const MDS_Arg_t *init);
+MDS_Err_t MDS_DevModuleDestroy(MDS_DevModule_t *module);
 
-extern MDS_Err_t MDS_DevAdaptrInit(MDS_DevAdaptr_t *adaptr, const char *name, const MDS_DevDriver_t *driver,
-                                   MDS_DevHandle_t *handle, const MDS_Arg_t *init);
-extern MDS_Err_t MDS_DevAdaptrDeInit(MDS_DevAdaptr_t *adaptr);
-extern MDS_DevAdaptr_t *MDS_DevAdaptrCreate(size_t typesz, const char *name, const MDS_DevDriver_t *driver,
-                                            const MDS_Arg_t *init);
-extern MDS_Err_t MDS_DevAdaptrDestroy(MDS_DevAdaptr_t *adaptr);
-extern MDS_Err_t MDS_DevAdaptrUpdateOpen(MDS_DevAdaptr_t *adaptr);
+MDS_Err_t MDS_DevAdaptrInit(MDS_DevAdaptr_t *adaptr, const char *name, const MDS_DevDriver_t *driver,
+                            MDS_DevHandle_t *handle, const MDS_Arg_t *init);
+MDS_Err_t MDS_DevAdaptrDeInit(MDS_DevAdaptr_t *adaptr);
+MDS_DevAdaptr_t *MDS_DevAdaptrCreate(size_t typesz, const char *name, const MDS_DevDriver_t *driver,
+                                     const MDS_Arg_t *init);
+MDS_Err_t MDS_DevAdaptrDestroy(MDS_DevAdaptr_t *adaptr);
+MDS_Err_t MDS_DevAdaptrUpdateOpen(MDS_DevAdaptr_t *adaptr);
 
-extern MDS_Err_t MDS_DevPeriphInit(MDS_DevPeriph_t *periph, const char *name, MDS_DevAdaptr_t *adaptr);
-extern MDS_Err_t MDS_DevPeriphDeInit(MDS_DevPeriph_t *periph);
-extern MDS_DevPeriph_t *MDS_DevPeriphCreate(size_t typesz, const char *name, MDS_DevAdaptr_t *adaptr);
-extern MDS_Err_t MDS_DevPeriphDestroy(MDS_DevPeriph_t *periph);
-extern MDS_Err_t MDS_DevPeriphOpen(MDS_DevPeriph_t *periph, MDS_Tick_t timeout);
-extern MDS_Err_t MDS_DevPeriphClose(MDS_DevPeriph_t *periph);
-extern MDS_DevPeriph_t *MDS_DevPeriphOpenForce(MDS_DevPeriph_t *periph);
-extern bool MDS_DevPeriphIsAccessible(MDS_DevPeriph_t *periph);
+MDS_Err_t MDS_DevPeriphInit(MDS_DevPeriph_t *periph, const char *name, MDS_DevAdaptr_t *adaptr);
+MDS_Err_t MDS_DevPeriphDeInit(MDS_DevPeriph_t *periph);
+MDS_DevPeriph_t *MDS_DevPeriphCreate(size_t typesz, const char *name, MDS_DevAdaptr_t *adaptr);
+MDS_Err_t MDS_DevPeriphDestroy(MDS_DevPeriph_t *periph);
+MDS_Err_t MDS_DevPeriphOpen(MDS_DevPeriph_t *periph, MDS_Tick_t timeout);
+MDS_Err_t MDS_DevPeriphClose(MDS_DevPeriph_t *periph);
+MDS_DevPeriph_t *MDS_DevPeriphOpenForce(MDS_DevPeriph_t *periph);
+bool MDS_DevPeriphIsAccessable(MDS_DevPeriph_t *periph);
 
-extern bool MDS_DeviceIsPeriph(const MDS_Device_t *device);
-extern const MDS_DevProbeId_t *MDS_DeviceGetId(const MDS_Device_t *device);
-extern MDS_Err_t MDS_DevModuleDump(const MDS_Device_t *device, MDS_DevDumpData_t *dump);
-extern MDS_Device_t *MDS_DeviceProbeDrivers(const MDS_DevDriver_t **driver, const MDS_Device_t *device,
-                                            const MDS_DevProbeTable_t drvList[], size_t drvSize);
+bool MDS_DeviceIsPeriph(const MDS_Device_t *device);
+const MDS_DevProbeId_t *MDS_DeviceGetId(const MDS_Device_t *device);
+MDS_Err_t MDS_DevModuleDump(const MDS_Device_t *device, MDS_DevDumpData_t *dump);
+MDS_Device_t *MDS_DeviceProbeDrivers(const MDS_DevDriver_t **driver, const MDS_Device_t *device,
+                                     const MDS_DevProbeTable_t drvList[], size_t drvSize);
 
 /* Define ------------------------------------------------------------------ */
 #define MDS_DEVICE_ARG_HANDLE_SIZE(arg, handleT)                                                                       \

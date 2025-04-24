@@ -13,10 +13,6 @@
 #include "mds_sys.h"
 
 /* Define ----------------------------------------------------------------- */
-#ifndef MDS_CORE_BACKTRACE_DEPTH
-#define MDS_CORE_BACKTRACE_DEPTH 16
-#endif
-
 #define MSTATUS_UIE  0x00000001
 #define MSTATUS_SIE  0x00000002
 #define MSTATUS_HIE  0x00000004

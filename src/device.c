@@ -47,22 +47,12 @@ static bool MDS_DeviceIsBusy(MDS_Device_t *device)
         return (false);
     }
 
-    MDS_Object_t *nextobj = MDS_ObjectNext(&(device->object));
-    if (nextobj == NULL) {
-        return (false);
-    }
-
-    MDS_Device_t *nextdev = CONTAINER_OF(nextobj, MDS_Device_t, object);
+    MDS_Device_t *nextdev = CONTAINER_OF(device->object.node.next, MDS_Device_t, object.node);
     if (nextdev == NULL) {
         return (false);
     }
 
-    MDS_DevPeriph_t *periph = CONTAINER_OF(nextdev, MDS_DevPeriph_t, device);
-    if (periph == NULL) {
-        return (false);
-    }
-
-    if ((periph->mount != (void *)(device))) {
+    if ((((MDS_DevPeriph_t *)(nextdev))->mount != (void *)(device))) {
         return (false);
     }
 
@@ -443,7 +433,7 @@ MDS_DevPeriph_t *MDS_DevPeriphOpenForce(MDS_DevPeriph_t *periph)
     return ((isOpened) ? (owner) : (NULL));
 }
 
-bool MDS_DevPeriphIsAccessible(MDS_DevPeriph_t *periph)
+bool MDS_DevPeriphIsAccessable(MDS_DevPeriph_t *periph)
 {
     MDS_ASSERT(periph != NULL);
     MDS_ASSERT(periph->mount != NULL);

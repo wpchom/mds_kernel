@@ -13,10 +13,6 @@
 #include "mds_sys.h"
 
 /* Define ----------------------------------------------------------------- */
-#ifndef MDS_CORE_BACKTRACE_DEPTH
-#define MDS_CORE_BACKTRACE_DEPTH 16
-#endif
-
 #if ((defined(__CC_ARM) && defined(__TARGET_FPU_VFP)) ||                                                               \
      (defined(__clang__) && defined(__VFP_FP__) && !defined(__SOFTFP__)) ||                                            \
      (defined(__ICCARM__) && defined(__ARMVFP__)) ||                                                                   \

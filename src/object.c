@@ -19,7 +19,7 @@
 
 /* Variable ---------------------------------------------------------------- */
 static MDS_ListNode_t g_objectList[] = {
-    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_DEVICE),  //
+    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_DEVICE),
 #ifndef MDS_KERNEL_REDIRECT
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_TIMER),      //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_THREAD),     //
@@ -43,10 +43,8 @@ MDS_Err_t MDS_ObjectInit(MDS_Object_t *object, MDS_ObjectType_t type, const char
     }
 
     MDS_ListInitNode(&(object->node));
-    if (name != NULL) {
-        MDS_MemBuffCcpy(object->name, name, '\0', sizeof(object->name));
-    }
     object->flags = type;
+    (void)MDS_Strlcpy(object->name, name, MDS_OBJECT_NAME_SIZE);
 
     MDS_Item_t lock = MDS_CoreInterruptLock();
     MDS_ListInsertNodePrev(&(g_objectList[type]), &(object->node));
@@ -109,34 +107,6 @@ MDS_Object_t *MDS_ObjectFind(const MDS_ObjectType_t type, const char *name)
     }
 
     return (NULL);
-}
-
-MDS_Object_t *MDS_ObjectPrev(const MDS_Object_t *object)
-{
-    MDS_ASSERT(object != NULL);
-
-    MDS_ObjectType_t type = MDS_ObjectGetType(object);
-    MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
-
-    if (object->node.prev != &(g_objectList[type])) {
-        return (CONTAINER_OF(object->node.prev, MDS_Object_t, node));
-    } else {
-        return (NULL);
-    }
-}
-
-MDS_Object_t *MDS_ObjectNext(const MDS_Object_t *object)
-{
-    MDS_ASSERT(object != NULL);
-
-    MDS_ObjectType_t type = MDS_ObjectGetType(object);
-    MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
-
-    if (object->node.next != &(g_objectList[type])) {
-        return (CONTAINER_OF(object->node.next, MDS_Object_t, node));
-    } else {
-        return (NULL);
-    }
 }
 
 const MDS_ListNode_t *MDS_ObjectGetList(MDS_ObjectType_t type)

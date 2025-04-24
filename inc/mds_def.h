@@ -28,6 +28,7 @@ typedef size_t MDS_Tick_t;
 typedef int64_t MDS_Time_t;
 typedef intptr_t MDS_Item_t;
 typedef uintptr_t MDS_Mask_t;
+
 typedef union MDS_Arg {
     void *arg;
 } MDS_Arg_t;
@@ -147,14 +148,12 @@ static inline size_t MDS_ListGetLength(const MDS_ListNode_t *list)
          (iter) = CONTAINER_OF((iter)->member.prev, __typeof__(*(iter)), member))
 
 /* Skip List --------------------------------------------------------------- */
-extern void MDS_SkipListInitNode(MDS_ListNode_t node[], size_t size);
-extern void MDS_SkipListRemoveNode(MDS_ListNode_t node[], size_t size);
-extern bool MDS_SkipListIsEmpty(MDS_ListNode_t node[], size_t size);
-extern MDS_ListNode_t *MDS_SkipListSearchNode(MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size,
-                                              const void *value,
-                                              int (*compare)(const MDS_ListNode_t *node, const void *value));
-extern size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size, size_t rand,
-                                     size_t shift);
+void MDS_SkipListInitNode(MDS_ListNode_t node[], size_t size);
+void MDS_SkipListRemoveNode(MDS_ListNode_t node[], size_t size);
+bool MDS_SkipListIsEmpty(MDS_ListNode_t node[], size_t size);
+MDS_ListNode_t *MDS_SkipListSearchNode(MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size, const void *value,
+                                       int (*compare)(const MDS_ListNode_t *node, const void *value));
+size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size, size_t rand, size_t shift);
 
 /* Tree -------------------------------------------------------------------- */
 typedef struct MDS_TreeNode {
@@ -163,11 +162,11 @@ typedef struct MDS_TreeNode {
     MDS_ListNode_t sibling;
 } MDS_TreeNode_t;
 
-extern void MDS_TreeInitNode(MDS_TreeNode_t *node);
-extern MDS_TreeNode_t *MDS_TreeInsertNode(MDS_TreeNode_t *parent, MDS_TreeNode_t *node);
-extern MDS_TreeNode_t *MDS_TreeRemoveNode(MDS_TreeNode_t *node);
-extern size_t MDS_TreeForeachNode(const MDS_TreeNode_t *tree, void (*func)(const MDS_TreeNode_t *, MDS_Arg_t *),
-                                  MDS_Arg_t *arg);
+void MDS_TreeInitNode(MDS_TreeNode_t *node);
+MDS_TreeNode_t *MDS_TreeInsertNode(MDS_TreeNode_t *parent, MDS_TreeNode_t *node);
+MDS_TreeNode_t *MDS_TreeRemoveNode(MDS_TreeNode_t *node);
+size_t MDS_TreeForeachNode(const MDS_TreeNode_t *tree, void (*func)(const MDS_TreeNode_t *, MDS_Arg_t *),
+                           MDS_Arg_t *arg);
 
 /* Message ----------------------------------------------------------------- */
 typedef struct MDS_MsgList {
@@ -176,36 +175,38 @@ typedef struct MDS_MsgList {
     struct MDS_MsgList *next;
 } MDS_MsgList_t;
 
-extern size_t MDS_MsgListGetLength(const MDS_MsgList_t *msg);
-extern size_t MDS_MsgListCopyBuff(void *buff, size_t size, const MDS_MsgList_t *msg);
+size_t MDS_MsgListGetLength(const MDS_MsgList_t *msg);
+size_t MDS_MsgListCopyBuff(void *buff, size_t size, const MDS_MsgList_t *msg);
 
 /* Memory ------------------------------------------------------------------ */
-extern bool MDS_MemAddrIsAligned(const void *address, uintptr_t align);
-extern void *MDS_MemBuffSet(void *dst, int c, size_t len);
-extern size_t MDS_MemBuffCopy(void *dst, size_t size, const void *src, size_t len);
-extern void *MDS_MemBuffCpy(void *dst, const void *src, size_t size);
-extern void *MDS_MemBuffCcpy(void *dst, const void *src, int c, size_t size);
-extern int MDS_MemBuffCmp(const void *buf1, const void *buf2, size_t size);
+bool MDS_MemAddrIsAligned(const void *address, uintptr_t align);
+void *MDS_MemBuffSet(void *dst, int c, size_t len);
+size_t MDS_MemBuffCopy(void *dst, size_t size, const void *src, size_t len);
+void *MDS_MemBuffCpy(void *dst, const void *src, size_t size);
+void *MDS_MemBuffCcpy(void *dst, const void *src, int c, size_t size);
+int MDS_MemBuffCmp(const void *buf1, const void *buf2, size_t size);
 
 /* String ------------------------------------------------------------------ */
-extern size_t MDS_StrAscLetterLength(const char *str);
-extern size_t MDS_StrAscNumberLength(const char *str, int base);
-extern size_t MDS_StrAsc2Hex(uint8_t *hex, size_t size, const char *asc, bool rightAlign);
-extern size_t MDS_StrHex2Asc(char *asc, size_t size, const uint8_t *hex, size_t len, bool lowCase);
-extern unsigned long long MDS_Strtoull(const char *str, char **context, int base);
-extern long long MDS_Strtoll(const char *str, char **context, int base);
-extern unsigned long MDS_Strtoul(const char *str, char **context, int base);
-extern long MDS_Strtol(const char *str, char **context, int base);
+size_t MDS_StrAscLetterLength(const char *str);
+size_t MDS_StrAscNumberLength(const char *str, int base);
+size_t MDS_StrAsc2Hex(uint8_t *hex, size_t size, const char *asc, bool rightAlign);
+size_t MDS_StrHex2Asc(char *asc, size_t size, const uint8_t *hex, size_t len, bool lowCase);
+size_t MDS_Strnlen(const char *str, size_t maxlen);
+size_t MDS_Strlen(const char *str);
+size_t MDS_Strlcpy(char *dst, const char *src, size_t dsize);
+size_t MDS_Strlcat(char *dst, const char *src, size_t dsize);
+unsigned long long MDS_Strtoull(const char *str, char **context, int base);
+long long MDS_Strtoll(const char *str, char **context, int base);
+unsigned long MDS_Strtoul(const char *str, char **context, int base);
+long MDS_Strtol(const char *str, char **context, int base);
 
 /* Format ------------------------------------------------------------------ */
-extern int MDS_VaStringNPrintf(char *buff, size_t size, const char *fmt, va_list ap);
-extern int MDS_StringNPrintf(char *buff, size_t size, const char *fmt, ...);
-extern int MDS_VaStringPrintf(char *buff, const char *fmt, va_list ap);
-extern int MDS_StringPrintf(char *buff, const char *fmt, ...);
-extern int MDS_VaStringScanf(const char *buff, const char *fmt, va_list ap);
-extern int MDS_StringScanf(const char *buff, const char *fmt, ...);
-extern int MDS_VaStringScanfS(const char *buff, const char *fmt, va_list ap);
-extern int MDS_StringScanfS(const char *buff, const char *fmt, ...);
+int MDS_Vsnprintf(char *buff, size_t size, const char *fmt, va_list ap);
+int MDS_Snprintf(char *buff, size_t size, const char *fmt, ...);
+int MDS_Vsprintf(char *buff, const char *fmt, va_list ap);
+int MDS_Sprintf(char *buff, const char *fmt, ...);
+int MDS_Vsscanf(const char *buff, const char *fmt, va_list ap);
+int MDS_Sscanf(const char *buff, const char *fmt, ...);
 
 /* Time -------------------------------------------------------------------- */
 #define MDS_TIME_NSEC_OF_SEC  1000000000
@@ -261,9 +262,9 @@ typedef enum MDS_TIME_Month {
     MDS_TIME_MONTH_DEC,
 } MDS_TIME_Month_t;
 
-extern MDS_Time_t MDS_TIME_ChangeTimeStamp(MDS_TimeDate_t *tm, int8_t tz);
-extern void MDS_TIME_ChangeTimeDate(MDS_TimeDate_t *tm, MDS_Time_t timestamp, int8_t tz);
-extern MDS_Time_t MDS_TIME_DiffTimeMs(MDS_TimeDate_t *tm1, MDS_TimeDate_t *tm2);
+MDS_Time_t MDS_TIME_ChangeTimeStamp(MDS_TimeDate_t *tm, int8_t tz);
+void MDS_TIME_ChangeTimeDate(MDS_TimeDate_t *tm, MDS_Time_t timestamp, int8_t tz);
+MDS_Time_t MDS_TIME_DiffTimeMs(MDS_TimeDate_t *tm1, MDS_TimeDate_t *tm2);
 
 #ifdef __cplusplus
 }
