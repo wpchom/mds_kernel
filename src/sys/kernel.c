@@ -208,11 +208,11 @@ MDS_Tick_t MDS_KernelGetSleepTick(void)
     return (sleepTick);
 }
 
-void MDS_KernelCompensateTick(MDS_Tick_t tickcount)
+void MDS_KernelCompensateTick(MDS_Tick_t ticks)
 {
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
-    MDS_Tick_t currTick = MDS_ClockGetTickCount() + tickcount;
+    MDS_Tick_t currTick = MDS_ClockGetTickCount() + ticks;
     MDS_ClockSetTickCount(currTick);
     MDS_SysTimerCheck();
 

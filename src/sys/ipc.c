@@ -13,21 +13,21 @@
 #include "kernel.h"
 
 /* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(SEMAPHORE_TRY_ACQUIRE, MDS_Semaphore_t *semaphore, MDS_Tick_t timeout);
+MDS_HOOK_INIT(SEMAPHORE_TRY_ACQUIRE, MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout);
 MDS_HOOK_INIT(SEMAPHORE_HAS_ACQUIRE, MDS_Semaphore_t *semaphore, MDS_Err_t err);
 MDS_HOOK_INIT(SEMAPHORE_HAS_RELEASE, MDS_Semaphore_t *semaphore);
-MDS_HOOK_INIT(MUTEX_TRY_ACQUIRE, MDS_Mutex_t *mutex, MDS_Tick_t timeout);
+MDS_HOOK_INIT(MUTEX_TRY_ACQUIRE, MDS_Mutex_t *mutex, MDS_Timeout_t timeout);
 MDS_HOOK_INIT(MUTEX_HAS_ACQUIRE, MDS_Mutex_t *mutex, MDS_Err_t err);
 MDS_HOOK_INIT(MUTEX_HAS_RELEASE, MDS_Mutex_t *mutex);
-MDS_HOOK_INIT(EVENT_TRY_ACQUIRE, MDS_Event_t *event, MDS_Tick_t timeout);
+MDS_HOOK_INIT(EVENT_TRY_ACQUIRE, MDS_Event_t *event, MDS_Timeout_t timeout);
 MDS_HOOK_INIT(EVENT_HAS_ACQUIRE, MDS_Event_t *event, MDS_Err_t err);
 MDS_HOOK_INIT(EVENT_HAS_SET, MDS_Event_t *event, MDS_Mask_t mask);
 MDS_HOOK_INIT(EVENT_HAS_CLR, MDS_Event_t *event, MDS_Mask_t mask);
-MDS_HOOK_INIT(MSGQUEUE_TRY_RECV, MDS_MsgQueue_t *msgQueue, MDS_Tick_t timeout);
+MDS_HOOK_INIT(MSGQUEUE_TRY_RECV, MDS_MsgQueue_t *msgQueue, MDS_Timeout_t timeout);
 MDS_HOOK_INIT(MSGQUEUE_HAS_RECV, MDS_MsgQueue_t *msgQueue, MDS_Err_t err);
-MDS_HOOK_INIT(MSGQUEUE_TRY_SEND, MDS_MsgQueue_t *msgQueue, MDS_Tick_t timeout);
+MDS_HOOK_INIT(MSGQUEUE_TRY_SEND, MDS_MsgQueue_t *msgQueue, MDS_Timeout_t timeout);
 MDS_HOOK_INIT(MSGQUEUE_HAS_SEND, MDS_MsgQueue_t *msgQueue, MDS_Err_t err);
-MDS_HOOK_INIT(MEMPOOL_TRY_ALLOC, MDS_MemPool_t *memPool, MDS_Tick_t timeout);
+MDS_HOOK_INIT(MEMPOOL_TRY_ALLOC, MDS_MemPool_t *memPool, MDS_Timeout_t timeout);
 MDS_HOOK_INIT(MEMPOOL_HAS_ALLOC, MDS_MemPool_t *memPool, void *ptr);
 MDS_HOOK_INIT(MEMPOOL_HAS_FREE, MDS_MemPool_t *memPool, void *ptr);
 
@@ -39,7 +39,7 @@ MDS_HOOK_INIT(MEMPOOL_HAS_FREE, MDS_MemPool_t *memPool, void *ptr);
 #endif
 
 /* IPC thread -------------------------------------------------------------- */
-static void IPC_ListSuspendThread(MDS_ListNode_t *list, MDS_Thread_t *thread, bool isPrio, MDS_Tick_t timeout)
+static void IPC_ListSuspendThread(MDS_ListNode_t *list, MDS_Thread_t *thread, bool isPrio, MDS_Timeout_t timeout)
 {
     MDS_Thread_t *find = NULL;
 
@@ -63,12 +63,13 @@ static void IPC_ListSuspendThread(MDS_ListNode_t *list, MDS_Thread_t *thread, bo
         MDS_ListInsertNodePrev(list, &(thread->node));
     }
 
-    if (timeout < MDS_TIMER_TICK_MAX) {
+    if (timeout.ticks < MDS_CLOCK_TICK_TIMER_MAX) {
         MDS_TimerStart(&(thread->timer), timeout);
     }
 }
 
-static MDS_Err_t IPC_ListSuspendWait(MDS_Item_t *lock, MDS_ListNode_t *list, MDS_Thread_t *thread, MDS_Tick_t timeout)
+static MDS_Err_t IPC_ListSuspendWait(MDS_Item_t *lock, MDS_ListNode_t *list, MDS_Thread_t *thread,
+                                     MDS_Timeout_t timeout)
 {
     MDS_Tick_t deltaTick = MDS_ClockGetTickCount();
 
@@ -81,12 +82,12 @@ static MDS_Err_t IPC_ListSuspendWait(MDS_Item_t *lock, MDS_ListNode_t *list, MDS
 
     *lock = MDS_CoreInterruptLock();
     deltaTick = MDS_ClockGetTickCount() - deltaTick;
-    if (timeout > deltaTick) {
-        timeout -= deltaTick;
+    if (timeout.ticks > deltaTick) {
+        timeout.ticks -= deltaTick;
 
         return (MDS_EOK);
     } else {
-        return (MDS_ETIME);
+        return (MDS_ETIMEOUT);
     }
 }
 
@@ -161,7 +162,7 @@ MDS_Err_t MDS_SemaphoreDestroy(MDS_Semaphore_t *semaphore)
     return (MDS_ObjectDestory(&(semaphore->object)));
 }
 
-MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Tick_t timeout)
+MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(semaphore != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(semaphore->object)) == MDS_OBJECT_TYPE_SEMAPHORE);
@@ -178,10 +179,10 @@ MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Tick_t timeout)
     if (semaphore->value > 0) {
         semaphore->value -= 1;
         MDS_CoreInterruptRestore(lock);
-    } else if (timeout == 0) {
-        thread->err = MDS_ETIME;
+    } else if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
+        thread->err = MDS_ETIMEOUT;
         MDS_CoreInterruptRestore(lock);
-        err = MDS_ETIME;
+        err = MDS_ETIMEOUT;
     } else if (thread != NULL) {
         MDS_IPC_DEBUG("semaphore suspend thread(%p) entry:%p timer wait:%u", thread, thread->entry, timeout);
 
@@ -252,7 +253,7 @@ MDS_Err_t MDS_ConditionDeInit(MDS_Condition_t *condition)
         return (MDS_EBUSY);
     }
 
-    while (MDS_SemaphoreAcquire(condition, 0) == MDS_EBUSY) {
+    while (MDS_SemaphoreAcquire(condition, MDS_TIMEOUT_NO_WAIT) == MDS_EBUSY) {
         MDS_ConditionBroadCast(condition);
     }
 
@@ -268,11 +269,11 @@ MDS_Err_t MDS_ConditionBroadCast(MDS_Condition_t *condition)
 
     MDS_Err_t err;
     do {
-        err = MDS_SemaphoreAcquire(condition, 0);
-        if ((err == MDS_ETIME) || (err == MDS_EOK)) {
+        err = MDS_SemaphoreAcquire(condition, MDS_TIMEOUT_NO_WAIT);
+        if ((err == MDS_ETIMEOUT) || (err == MDS_EOK)) {
             MDS_SemaphoreRelease(condition);
         }
-    } while (err == MDS_ETIME);
+    } while (err == MDS_ETIMEOUT);
 
     return (err);
 }
@@ -294,7 +295,7 @@ MDS_Err_t MDS_ConditionSignal(MDS_Condition_t *condition)
     return (err);
 }
 
-MDS_Err_t MDS_ConditionWait(MDS_Condition_t *condition, MDS_Mutex_t *mutex, MDS_Tick_t timeout)
+MDS_Err_t MDS_ConditionWait(MDS_Condition_t *condition, MDS_Mutex_t *mutex, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(condition != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(condition->object)) == MDS_OBJECT_TYPE_SEMAPHORE);
@@ -311,9 +312,9 @@ MDS_Err_t MDS_ConditionWait(MDS_Condition_t *condition, MDS_Mutex_t *mutex, MDS_
     if (condition->value > 0) {
         condition->value -= 1;
         MDS_CoreInterruptRestore(lock);
-    } else if (timeout == 0) {
+    } else if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
         MDS_CoreInterruptRestore(lock);
-        err = MDS_ETIME;
+        err = MDS_ETIMEOUT;
     } else {
         MDS_ASSERT(thread != NULL);
 
@@ -323,7 +324,7 @@ MDS_Err_t MDS_ConditionWait(MDS_Condition_t *condition, MDS_Mutex_t *mutex, MDS_
         MDS_KernelSchedulerCheck();
 
         err = thread->err;
-        MDS_MutexAcquire(mutex, MDS_CLOCK_TICK_FOREVER);
+        MDS_MutexAcquire(mutex, MDS_TIMEOUT_FOREVER);
     }
 
     return (err);
@@ -380,7 +381,7 @@ MDS_Err_t MDS_MutexDestroy(MDS_Mutex_t *mutex)
     return (MDS_ObjectDestory(&(mutex->object)));
 }
 
-MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Tick_t timeout)
+MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(mutex != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(mutex->object)) == MDS_OBJECT_TYPE_MUTEX);
@@ -416,10 +417,10 @@ MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Tick_t timeout)
             err = MDS_ERANGE;
         }
         MDS_CoreInterruptRestore(lock);
-    } else if (timeout == 0) {
-        thread->err = MDS_ETIME;
+    } else if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
+        thread->err = MDS_ETIMEOUT;
         MDS_CoreInterruptRestore(lock);
-        err = MDS_ETIME;
+        err = MDS_ETIMEOUT;
     } else {
         MDS_IPC_DEBUG("mutex suspend thread(%p) entry:%p timer wait:%u", thread, thread->entry, timeout);
 
@@ -523,7 +524,7 @@ MDS_Err_t MDS_RwLockDeInit(MDS_RwLock_t *rwlock)
 {
     MDS_ASSERT(rwlock != NULL);
 
-    MDS_Err_t err = MDS_MutexAcquire(&(rwlock->mutex), 0);
+    MDS_Err_t err = MDS_MutexAcquire(&(rwlock->mutex), MDS_TIMEOUT_NO_WAIT);
     if (err != MDS_EOK) {
         return (err);
     }
@@ -532,9 +533,9 @@ MDS_Err_t MDS_RwLockDeInit(MDS_RwLock_t *rwlock)
         (!MDS_ListIsEmpty(&(rwlock->condRd.list)))) {
         err = MDS_EBUSY;
     } else {
-        err = MDS_SemaphoreAcquire(&(rwlock->condRd), 0);
+        err = MDS_SemaphoreAcquire(&(rwlock->condRd), MDS_TIMEOUT_NO_WAIT);
         if (err == MDS_EOK) {
-            err = MDS_SemaphoreAcquire(&(rwlock->condWr), 0);
+            err = MDS_SemaphoreAcquire(&(rwlock->condWr), MDS_TIMEOUT_NO_WAIT);
             if (err == MDS_EOK) {
                 MDS_SemaphoreRelease(&(rwlock->condRd));
                 MDS_SemaphoreRelease(&(rwlock->condWr));
@@ -558,7 +559,7 @@ MDS_Err_t MDS_RwLockDeInit(MDS_RwLock_t *rwlock)
     return (err);
 }
 
-MDS_Err_t MDS_RwLockAcquireRead(MDS_RwLock_t *rwlock, MDS_Tick_t timeout)
+MDS_Err_t MDS_RwLockAcquireRead(MDS_RwLock_t *rwlock, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(rwlock != NULL);
 
@@ -569,9 +570,9 @@ MDS_Err_t MDS_RwLockAcquireRead(MDS_RwLock_t *rwlock, MDS_Tick_t timeout)
     }
 
     while ((rwlock->readers < 0) || (!MDS_ListIsEmpty(&(rwlock->condWr.list)))) {
-        if (timeout != MDS_CLOCK_TICK_FOREVER) {
+        if (timeout.ticks != MDS_CLOCK_TICK_FOREVER) {
             MDS_Tick_t elapsedTick = MDS_ClockGetTickCount() - startTick;
-            timeout = (elapsedTick <= timeout) ? (timeout - elapsedTick) : (0);
+            timeout.ticks = (elapsedTick <= timeout.ticks) ? (timeout.ticks - elapsedTick) : (MDS_CLOCK_TICK_NO_WAIT);
         }
         err = MDS_ConditionWait(&(rwlock->condRd), &(rwlock->mutex), timeout);
         if (err != MDS_EOK) {
@@ -588,7 +589,7 @@ MDS_Err_t MDS_RwLockAcquireRead(MDS_RwLock_t *rwlock, MDS_Tick_t timeout)
     return (err);
 }
 
-MDS_Err_t MDS_RwLockAcquireWrite(MDS_RwLock_t *rwlock, MDS_Tick_t timeout)
+MDS_Err_t MDS_RwLockAcquireWrite(MDS_RwLock_t *rwlock, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(rwlock != NULL);
 
@@ -599,9 +600,9 @@ MDS_Err_t MDS_RwLockAcquireWrite(MDS_RwLock_t *rwlock, MDS_Tick_t timeout)
     }
 
     while (rwlock->readers != 0) {
-        if (timeout != MDS_CLOCK_TICK_FOREVER) {
+        if (timeout.ticks != MDS_CLOCK_TICK_FOREVER) {
             MDS_Tick_t elapsedTick = MDS_ClockGetTickCount() - startTick;
-            timeout = (elapsedTick <= timeout) ? (timeout - elapsedTick) : (0);
+            timeout.ticks = (elapsedTick <= timeout.ticks) ? (timeout.ticks - elapsedTick) : (MDS_CLOCK_TICK_NO_WAIT);
         }
         err = MDS_ConditionWait(&(rwlock->condWr), &(rwlock->mutex), timeout);
         if (err != MDS_EOK) {
@@ -622,7 +623,7 @@ MDS_Err_t MDS_RwLockRelease(MDS_RwLock_t *rwlock)
 {
     MDS_ASSERT(rwlock != NULL);
 
-    MDS_Err_t err = MDS_MutexAcquire(&(rwlock->mutex), MDS_CLOCK_TICK_FOREVER);
+    MDS_Err_t err = MDS_MutexAcquire(&(rwlock->mutex), MDS_TIMEOUT_FOREVER);
     if (err != MDS_EOK) {
         return (err);
     }
@@ -691,7 +692,7 @@ MDS_Err_t MDS_EventDestroy(MDS_Event_t *event)
     return (MDS_ObjectDestory(&(event->object)));
 }
 
-MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv, MDS_Tick_t timeout)
+MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(event != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(event->object)) == MDS_OBJECT_TYPE_EVENT);
@@ -721,10 +722,10 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS
             event->value &= (MDS_Mask_t)(~mask);
         }
         MDS_CoreInterruptRestore(lock);
-    } else if (timeout == 0) {
-        thread->err = MDS_ETIME;
+    } else if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
+        thread->err = MDS_ETIMEOUT;
         MDS_CoreInterruptRestore(lock);
-        err = MDS_ETIME;
+        err = MDS_ETIMEOUT;
     } else if (thread != NULL) {
         MDS_IPC_DEBUG("event suspend thread(%p) entry:%p timer wait:%u", thread, thread->entry, timeout);
 
@@ -905,7 +906,7 @@ MDS_Err_t MDS_MsgQueueDestroy(MDS_MsgQueue_t *msgQueue)
     return (MDS_ObjectDestory(&(msgQueue->object)));
 }
 
-MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *len, MDS_Tick_t timeout)
+MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *len, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(msgQueue != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(msgQueue->object)) == MDS_OBJECT_TYPE_MSGQUEUE);
@@ -919,8 +920,8 @@ MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *
     MDS_Item_t lock = MDS_CoreInterruptLock();
     do {
         if (msgQueue->lhead == NULL) {
-            if (timeout == 0) {
-                err = MDS_ETIME;
+            if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
+                err = MDS_ETIMEOUT;
                 break;
             }
             if (thread == NULL) {
@@ -997,7 +998,7 @@ MDS_Err_t MDS_MsgQueueRecvRelease(MDS_MsgQueue_t *msgQueue, void *recv)
     return (MDS_EOK);
 }
 
-MDS_Err_t MDS_MsgQueueRecvCopy(MDS_MsgQueue_t *msgQueue, void *buff, size_t size, size_t *len, MDS_Tick_t timeout)
+MDS_Err_t MDS_MsgQueueRecvCopy(MDS_MsgQueue_t *msgQueue, void *buff, size_t size, size_t *len, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(buff != NULL);
     MDS_ASSERT(size > 0);
@@ -1017,7 +1018,7 @@ MDS_Err_t MDS_MsgQueueRecvCopy(MDS_MsgQueue_t *msgQueue, void *buff, size_t size
     return (err);
 }
 
-MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msgList, MDS_Tick_t timeout)
+MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msgList, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(msgQueue != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(msgQueue->object)) == MDS_OBJECT_TYPE_MSGQUEUE);
@@ -1037,7 +1038,7 @@ MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msg
     MDS_Item_t lock = MDS_CoreInterruptLock();
     do {
         if (msgQueue->lfree == NULL) {
-            if (timeout == 0) {
+            if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
                 err = MDS_ERANGE;
                 break;
             }
@@ -1069,7 +1070,7 @@ MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msg
     MDS_HOOK_CALL(MSGQUEUE_HAS_SEND, msgQueue, err);
 
     if (err != MDS_EOK) {
-        return ((err == MDS_ETIME) ? (MDS_ERANGE) : (err));
+        return ((err == MDS_ETIMEOUT) ? (MDS_ERANGE) : (err));
     }
 
     msg->len = len;
@@ -1098,7 +1099,7 @@ MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msg
     return (MDS_EOK);
 }
 
-MDS_Err_t MDS_MsgQueueSend(MDS_MsgQueue_t *msgQueue, const void *buff, size_t len, MDS_Tick_t timeout)
+MDS_Err_t MDS_MsgQueueSend(MDS_MsgQueue_t *msgQueue, const void *buff, size_t len, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(buff != NULL);
 
@@ -1118,7 +1119,7 @@ MDS_Err_t MDS_MsgQueueUrgentMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *m
         return (MDS_EINVAL);
     }
 
-    MDS_HOOK_CALL(MSGQUEUE_TRY_SEND, msgQueue, 0);
+    MDS_HOOK_CALL(MSGQUEUE_TRY_SEND, msgQueue, MDS_TIMEOUT_NO_WAIT);
 
     MDS_Err_t err = MDS_EOK;
     MDS_Item_t lock = MDS_CoreInterruptLock();
@@ -1285,7 +1286,7 @@ MDS_Err_t MDS_MemPoolDestroy(MDS_MemPool_t *memPool)
     return (MDS_ObjectDestory(&(memPool->object)));
 }
 
-void *MDS_MemPoolAlloc(MDS_MemPool_t *memPool, MDS_Tick_t timeout)
+void *MDS_MemPoolAlloc(MDS_MemPool_t *memPool, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(memPool != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(memPool->object)) == MDS_OBJECT_TYPE_MEMPOOL);
@@ -1299,8 +1300,8 @@ void *MDS_MemPoolAlloc(MDS_MemPool_t *memPool, MDS_Tick_t timeout)
     MDS_Item_t lock = MDS_CoreInterruptLock();
     do {
         if (memPool->lfree == NULL) {
-            if (timeout == 0) {
-                err = MDS_ETIME;
+            if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
+                err = MDS_ETIMEOUT;
                 break;
             }
             if (thread == NULL) {

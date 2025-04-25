@@ -112,7 +112,7 @@ MDS_Err_t MDS_DevPeriphInit(MDS_DevPeriph_t *periph, const char *name, MDS_DevAd
 MDS_Err_t MDS_DevPeriphDeInit(MDS_DevPeriph_t *periph);
 MDS_DevPeriph_t *MDS_DevPeriphCreate(size_t typesz, const char *name, MDS_DevAdaptr_t *adaptr);
 MDS_Err_t MDS_DevPeriphDestroy(MDS_DevPeriph_t *periph);
-MDS_Err_t MDS_DevPeriphOpen(MDS_DevPeriph_t *periph, MDS_Tick_t timeout);
+MDS_Err_t MDS_DevPeriphOpen(MDS_DevPeriph_t *periph, MDS_Timeout_t timeout);
 MDS_Err_t MDS_DevPeriphClose(MDS_DevPeriph_t *periph);
 MDS_DevPeriph_t *MDS_DevPeriphOpenForce(MDS_DevPeriph_t *periph);
 bool MDS_DevPeriphIsAccessable(MDS_DevPeriph_t *periph);

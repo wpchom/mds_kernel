@@ -24,7 +24,12 @@ extern "C" {
 #endif
 
 /* Typedef ----------------------------------------------------------------- */
-typedef size_t MDS_Tick_t;
+#if (defined(MDS_TICK_WITH_64BIT) && (MDS_TICK_WITH_64BIT))
+typedef uint64_t MDS_Tick_t;
+#else
+typedef uint32_t MDS_Tick_t;
+#endif
+
 typedef int64_t MDS_Time_t;
 typedef intptr_t MDS_Item_t;
 typedef uintptr_t MDS_Mask_t;
@@ -35,22 +40,22 @@ typedef union MDS_Arg {
 
 typedef enum MDS_Err {
     MDS_EOK = 0,
-    MDS_EPERM = -1,     // Operation not permitted
-    MDS_ENOENT = -2,    // No such file or directory
-    MDS_EINTR = -4,     // Interrupted system call
-    MDS_EIO = -5,       // I/O error
-    MDS_EAGAIN = -11,   // Try again
-    MDS_ENOMEM = -12,   // Out of memory
-    MDS_EACCES = -13,   // Permission denied
-    MDS_EFAULT = -14,   // Bad address
-    MDS_EBUSY = -16,    // Device or resource busy
-    MDS_EEXIST = -17,   // File exists
-    MDS_ENODEV = -19,   // No such device
-    MDS_ENOTDIR = -20,  // Not a directory
-    MDS_EISDIR = -21,   // Is a directory
-    MDS_EINVAL = -22,   // Invalid argument
-    MDS_ERANGE = -34,   // Math result not representable
-    MDS_ETIME = -62,    // Timer expired
+    MDS_EPERM = -1,      // Operation not permitted
+    MDS_ENOENT = -2,     // No such file or directory
+    MDS_EINTR = -4,      // Interrupted system call
+    MDS_EIO = -5,        // I/O error
+    MDS_EAGAIN = -11,    // Try again
+    MDS_ENOMEM = -12,    // Out of memory
+    MDS_EACCES = -13,    // Permission denied
+    MDS_EFAULT = -14,    // Bad address
+    MDS_EBUSY = -16,     // Device or resource busy
+    MDS_EEXIST = -17,    // File exists
+    MDS_ENODEV = -19,    // No such device
+    MDS_ENOTDIR = -20,   // Not a directory
+    MDS_EISDIR = -21,    // Is a directory
+    MDS_EINVAL = -22,    // Invalid argument
+    MDS_ERANGE = -34,    // Math result not representable
+    MDS_ETIMEOUT = -62,  // Timer expired
 
     MDS_ENODEF = -__INT_MAX__,
 } MDS_Err_t;

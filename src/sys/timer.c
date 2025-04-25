@@ -56,7 +56,7 @@ static int TIMER_SkipListCompare(const MDS_ListNode_t *node, const void *value)
     MDS_Tick_t ticklimit = *((const MDS_Tick_t *)(value));
     MDS_Tick_t diffTick = timer->ticklimit - ticklimit;
 
-    return ((diffTick != 0) && (diffTick < MDS_TIMER_TICK_MAX)) ? (1) : (-1);
+    return ((diffTick != 0) && (diffTick < MDS_CLOCK_TICK_TIMER_MAX)) ? (1) : (-1);
 }
 
 static void TIMER_Check(MDS_ListNode_t timerList[], size_t size, bool isSoft)
@@ -72,7 +72,7 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size, bool isSoft)
         MDS_Tick_t currTick = MDS_ClockGetTickCount();
         MDS_Timer_t *t = CONTAINER_OF(timerList[size - 1].next, MDS_Timer_t, node[size - 1]);
 
-        if ((currTick - t->ticklimit) >= MDS_TIMER_TICK_MAX) {
+        if ((currTick - t->ticklimit) >= MDS_CLOCK_TICK_TIMER_MAX) {
             break;
         }
 
@@ -114,7 +114,7 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size, bool isSoft)
         MDS_ListRemoveNode(&(t->node[size - 1]));
         if ((t->flags & (MDS_TIMER_FLAG_ACTIVED | MDS_TIMER_TYPE_PERIOD)) ==
             (MDS_TIMER_FLAG_ACTIVED | MDS_TIMER_TYPE_PERIOD)) {
-            MDS_TimerStart(t, t->ticklimit - t->tickstart);
+            MDS_TimerStart(t, MDS_TIMEOUT_TICKS(t->ticklimit - t->tickstart));
         }
     }
 
@@ -152,9 +152,9 @@ static __attribute__((noreturn)) void TIMER_ThreadEntry(MDS_Arg_t *arg)
             MDS_KernelSchedulerCheck();
         } else {
             MDS_Tick_t currTick = MDS_ClockGetTickCount();
-            if ((nextTick - currTick) < MDS_TIMER_TICK_MAX) {
+            if ((nextTick - currTick) < MDS_CLOCK_TICK_TIMER_MAX) {
                 nextTick = nextTick - currTick;
-                MDS_ThreadDelayTick(nextTick);
+                MDS_ThreadDelay(MDS_TIMEOUT_TICKS(nextTick));
             }
         }
 
@@ -209,12 +209,12 @@ MDS_Err_t MDS_TimerDestroy(MDS_Timer_t *timer)
     return (MDS_ObjectDestory(&(timer->object)));
 }
 
-MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Tick_t timeout)
+MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(timer != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(timer->object)) == MDS_OBJECT_TYPE_TIMER);
 
-    if (timeout >= MDS_TIMER_TICK_MAX) {
+    if (timeout.ticks >= MDS_CLOCK_TICK_TIMER_MAX) {
         return (MDS_EINVAL);
     }
 
@@ -232,11 +232,11 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Tick_t timeout)
         MDS_SkipListRemoveNode(timer->node, ARRAY_SIZE(timer->node));
         timer->flags &= ~MDS_TIMER_FLAG_ACTIVED;
 
-        if (timeout == 0) {
+        if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
             MDS_HOOK_CALL(TIMER_STOP, timer);
         } else {
             timer->tickstart = MDS_ClockGetTickCount();
-            timer->ticklimit = timer->tickstart + timeout;
+            timer->ticklimit = timer->tickstart + timeout.ticks;
 
             MDS_HOOK_CALL(TIMER_START, timer);
 

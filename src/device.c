@@ -340,7 +340,7 @@ MDS_Err_t MDS_DevPeriphDestroy(MDS_DevPeriph_t *periph)
     return (err);
 }
 
-MDS_Err_t MDS_DevPeriphOpen(MDS_DevPeriph_t *periph, MDS_Tick_t timeout)
+MDS_Err_t MDS_DevPeriphOpen(MDS_DevPeriph_t *periph, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(periph != NULL);
     MDS_ASSERT(periph->mount != NULL);

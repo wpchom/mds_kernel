@@ -78,7 +78,7 @@ void MDS_MemHeapFree(MDS_MemHeap_t *memheap, void *ptr)
         return;
     }
 
-    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_CLOCK_TICK_FOREVER);
+    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_TIMEOUT_FOREVER);
     if (err == MDS_EOK) {
         if ((memheap->ops != NULL) && (memheap->ops->free != NULL)) {
             memheap->ops->free(memheap, ptr);
@@ -95,7 +95,7 @@ void *MDS_MemHeapAlloc(MDS_MemHeap_t *memheap, size_t size)
 
     void *pbuf = NULL;
 
-    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_CLOCK_TICK_FOREVER);
+    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_TIMEOUT_FOREVER);
     if (err == MDS_EOK) {
         if ((memheap->ops != NULL) && (memheap->ops->alloc != NULL)) {
             pbuf = memheap->ops->alloc(memheap, size);
@@ -121,7 +121,7 @@ void *MDS_MemHeapRealloc(MDS_MemHeap_t *memheap, void *ptr, size_t size)
 
     void *pbuf = NULL;
 
-    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_CLOCK_TICK_FOREVER);
+    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_TIMEOUT_FOREVER);
     if (err == MDS_EOK) {
         if ((memheap->ops != NULL) && (memheap->ops->realloc != NULL)) {
             pbuf = memheap->ops->realloc(memheap, ptr, size);

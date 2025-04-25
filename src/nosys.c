@@ -22,7 +22,7 @@ static int TIMER_SkipListCompare(const MDS_ListNode_t *node, const void *value)
     MDS_Tick_t ticklimit = *((const MDS_Tick_t *)(value));
     MDS_Tick_t diffTick = timer->ticklimit - ticklimit;
 
-    return ((diffTick != 0) && (diffTick < MDS_TIMER_TICK_MAX)) ? (1) : (-1);
+    return ((diffTick != 0) && (diffTick < MDS_CLOCK_TICK_TIMER_MAX)) ? (1) : (-1);
 }
 
 static void TIMER_Check(MDS_ListNode_t timerList[], size_t size)
@@ -38,7 +38,7 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size)
         MDS_Tick_t currTick = MDS_ClockGetTickCount();
         MDS_Timer_t *t = CONTAINER_OF(timerList[size - 1].next, MDS_Timer_t, node[size - 1]);
 
-        if ((currTick - t->ticklimit) >= MDS_TIMER_TICK_MAX) {
+        if ((currTick - t->ticklimit) >= MDS_CLOCK_TICK_TIMER_MAX) {
             break;
         }
 
@@ -59,7 +59,7 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size)
         MDS_ListRemoveNode(&(t->node[size - 1]));
         if ((t->flags & (MDS_TIMER_FLAG_ACTIVED | MDS_TIMER_TYPE_PERIOD)) ==
             (MDS_TIMER_FLAG_ACTIVED | MDS_TIMER_TYPE_PERIOD)) {
-            MDS_TimerStart(t, t->ticklimit - t->tickstart);
+            MDS_TimerStart(t, MDS_TIMEOUT_TICKS(t->ticklimit - t->tickstart));
         }
     }
 
@@ -122,12 +122,12 @@ MDS_Err_t MDS_TimerDestroy(MDS_Timer_t *timer)
     return (MDS_ObjectDestory(&(timer->object)));
 }
 
-MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Tick_t timeout)
+MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(timer != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(timer->object)) == MDS_OBJECT_TYPE_TIMER);
 
-    if (timeout >= MDS_TIMER_TICK_MAX) {
+    if (timeout.ticks >= MDS_CLOCK_TICK_TIMER_MAX) {
         return (MDS_EINVAL);
     }
 
@@ -140,9 +140,9 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Tick_t timeout)
         MDS_SkipListRemoveNode(timer->node, ARRAY_SIZE(timer->node));
         timer->flags &= ~MDS_TIMER_FLAG_ACTIVED;
 
-        if (timeout > 0) {
+        if (timeout.ticks > 0) {
             timer->tickstart = MDS_ClockGetTickCount();
-            timer->ticklimit = timer->tickstart + timeout;
+            timer->ticklimit = timer->tickstart + timeout.ticks;
 
             MDS_ListNode_t *skipNode[ARRAY_SIZE(timer->node)];
             MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node), &(timer->ticklimit),
@@ -261,12 +261,12 @@ MDS_Err_t MDS_SemaphoreDestroy(MDS_Semaphore_t *semaphore)
     return (MDS_ObjectDestory(&(semaphore->object)));
 }
 
-MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Tick_t timeout)
+MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(semaphore != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(semaphore->object)) == MDS_OBJECT_TYPE_SEMAPHORE);
 
-    MDS_Err_t err = MDS_ETIME;
+    MDS_Err_t err = MDS_ETIMEOUT;
     MDS_Tick_t tickstart = MDS_ClockGetTickCount();
 
     MDS_LOOP {
@@ -277,7 +277,7 @@ MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Tick_t timeout)
         }
         MDS_CoreInterruptRestore(lock);
 
-        if ((err == MDS_EOK) || ((MDS_ClockGetTickCount() - tickstart) >= timeout)) {
+        if ((err == MDS_EOK) || ((MDS_ClockGetTickCount() - tickstart) >= timeout.ticks)) {
             break;
         }
     }
@@ -361,12 +361,12 @@ MDS_Err_t MDS_MutexDestroy(MDS_Mutex_t *mutex)
     return (MDS_ObjectDestory(&(mutex->object)));
 }
 
-MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Tick_t timeout)
+MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(mutex != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(mutex->object)) == MDS_OBJECT_TYPE_MUTEX);
 
-    MDS_Err_t err = MDS_ETIME;
+    MDS_Err_t err = MDS_ETIMEOUT;
     MDS_Tick_t tickstart = MDS_ClockGetTickCount();
 
     MDS_LOOP {
@@ -377,7 +377,7 @@ MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Tick_t timeout)
         }
         MDS_CoreInterruptRestore(lock);
 
-        if ((err == MDS_EOK) || ((MDS_ClockGetTickCount() - tickstart) >= timeout)) {
+        if ((err == MDS_EOK) || ((MDS_ClockGetTickCount() - tickstart) >= timeout.ticks)) {
             break;
         }
     }
@@ -446,7 +446,7 @@ MDS_Err_t MDS_EventDestroy(MDS_Event_t *event)
     return (MDS_ObjectDestory(&(event->object)));
 }
 
-MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv, MDS_Tick_t timeout)
+MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(event != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(event->object)) == MDS_OBJECT_TYPE_EVENT);
@@ -456,7 +456,7 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS
         return (MDS_EINVAL);
     }
 
-    MDS_Err_t err = MDS_ETIME;
+    MDS_Err_t err = MDS_ETIMEOUT;
     MDS_Tick_t tickstart = MDS_ClockGetTickCount();
 
     MDS_LOOP {
@@ -473,7 +473,7 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS
         }
         MDS_CoreInterruptRestore(lock);
 
-        if ((err == MDS_EOK) || ((MDS_ClockGetTickCount() - tickstart) >= timeout)) {
+        if ((err == MDS_EOK) || ((MDS_ClockGetTickCount() - tickstart) >= timeout.ticks)) {
             break;
         }
     }
@@ -567,11 +567,11 @@ MDS_Tick_t MDS_KernelGetSleepTick(void)
     return (sleepTick);
 }
 
-void MDS_KernelCompensateTick(MDS_Tick_t tickcount)
+void MDS_KernelCompensateTick(MDS_Tick_t ticks)
 {
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
-    MDS_Tick_t currTick = MDS_ClockGetTickCount() + tickcount;
+    MDS_Tick_t currTick = MDS_ClockGetTickCount() + ticks;
     MDS_ClockSetTickCount(currTick);
     MDS_SysTimerCheck();
 
@@ -611,7 +611,7 @@ void MDS_ClockIncTickCount(void)
 MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
-    MDS_Time_t ts = g_unixTimeBase + MDS_ClockTickToMs(ticks);
+    MDS_Time_t ts = g_unixTimeBase + MDS_CLOCK_TICK_TO_MS(ticks);
 
     if (tz != NULL) {
         *tz = g_unixTimeZone;
@@ -624,6 +624,6 @@ void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
 
-    g_unixTimeBase = ts - MDS_ClockTickToMs(ticks);
+    g_unixTimeBase = ts - MDS_CLOCK_TICK_TO_MS(ticks);
     g_unixTimeZone = tz;
 }

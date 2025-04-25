@@ -49,7 +49,7 @@ void MDS_ClockIncTickCount(void)
 MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
-    MDS_Time_t ts = g_unixTimeBase + MDS_ClockTickToMs(ticks);
+    MDS_Time_t ts = g_unixTimeBase + MDS_CLOCK_TICK_TO_MS(ticks);
 
     if (tz != NULL) {
         *tz = g_unixTimeZone;
@@ -62,7 +62,7 @@ void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
 {
     MDS_Tick_t ticks = MDS_ClockGetTickCount();
 
-    g_unixTimeBase = ts - MDS_ClockTickToMs(ticks);
+    g_unixTimeBase = ts - MDS_CLOCK_TICK_TO_MS(ticks);
     g_unixTimeZone = tz;
 }
 

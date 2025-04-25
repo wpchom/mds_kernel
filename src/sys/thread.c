@@ -74,7 +74,7 @@ static void THREAD_Timeout(MDS_Arg_t *arg)
 
     MDS_SchedulerInsertThread(thread);
 
-    thread->err = MDS_ETIME;
+    thread->err = MDS_ETIMEOUT;
 
     MDS_CoreInterruptRestore(lock);
 
@@ -251,26 +251,26 @@ MDS_Err_t MDS_ThreadSuspend(MDS_Thread_t *thread)
     return (MDS_EOK);
 }
 
-MDS_Err_t MDS_ThreadDelayTick(MDS_Tick_t delay)
+MDS_Err_t MDS_ThreadDelay(MDS_Timeout_t timeout)
 {
     MDS_Item_t lock = MDS_CoreInterruptLock();
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
 
     MDS_ASSERT(thread != NULL);
 
-    if (delay == 0) {
+    if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
         thread->remainTick = thread->initTick;
         thread->state |= MDS_THREAD_FLAG_YIELD;
     } else {
         MDS_ThreadSuspend(thread);
-        MDS_TimerStart(&(thread->timer), delay);
+        MDS_TimerStart(&(thread->timer), timeout);
     }
 
     MDS_CoreInterruptRestore(lock);
 
     MDS_KernelSchedulerCheck();
 
-    if (thread->err == MDS_ETIME) {
+    if (thread->err == MDS_ETIMEOUT) {
         thread->err = MDS_EOK;
     }
 
