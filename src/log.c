@@ -13,10 +13,72 @@
 #include "mds_sys.h"
 
 /* Define ------------------------------------------------------------------ */
-#ifndef MDS_LOG_PRINT_LEVEL
-#define MDS_LOG_PRINT_LEVEL MDS_LOG_LEVEL_INFO
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_LOG_BUILD_LEVEL);
+
+/* Variable ---------------------------------------------------------------- */
+static MDS_LOG_ModuleVaPrint_t g_logVaPrintFunc = NULL;
+
+/* Function ---------------------------------------------------------------- */
+void MDS_LOG_RegisterVaPrint(MDS_LOG_ModuleVaPrint_t logVaPrint)
+{
+    g_logVaPrintFunc = logVaPrint;
+}
+
+static void MDS_LOG_ModuleVaPrintf(const MDS_LOG_Module_t *module, uint8_t level, size_t va_size,
+                                   const char *fmt, va_list va_args)
+{
+#if (defined(CONFIG_MDS_LOG_FILTER_ENABLE) && (CONFIG_MDS_LOG_FILTER_ENABLE != 0))
+    if ((module != NULL) && (module->filter != NULL)) {
+        if (level > module->filter->level) {
+            return;
+        }
+        if (module->filter->backend != NULL) {
+            module->filter->backend(module, level, va_size, fmt, va_args);
+            return;
+        }
+    }
+#endif
+    if (g_logVaPrintFunc != NULL) {
+        g_logVaPrintFunc(module, level, va_size, fmt, va_args);
+    }
+}
+
+void MDS_LOG_ModulePrintf(const MDS_LOG_Module_t *module, uint8_t level, size_t va_size,
+                          const char *fmt, ...)
+{
+    va_list va_args;
+
+    va_start(va_args, fmt);
+    MDS_LOG_ModuleVaPrintf(module, level, va_size, fmt, va_args);
+    va_end(va_args);
+}
+
+__attribute__((weak)) void MDS_CorePanicTrace(void)
+{
+}
+
+__attribute__((noreturn)) void MDS_PanicPrintf(size_t va_size, const char *fmt, ...)
+{
+#if (defined(CONFIG_MDS_LOG_ENABLE) && (CONFIG_MDS_LOG_ENABLE != 0))
+    va_list va_args;
+
+    va_start(va_args, fmt);
+    MDS_LOG_ModuleVaPrintf(__THIS_LOG_MODULE_HANDLE, MDS_LOG_LEVEL_FAT, va_size, fmt, va_args);
+    va_end(va_args);
+#else
+    UNUSED(va_size);
+    UNUSED(fmt);
 #endif
 
+    MDS_CorePanicTrace();
+
+    MDS_Item_t lock = MDS_CoreInterruptLock();
+    for (;;) {
+        UNUSED(lock);
+    }
+}
+
+/* Compress ---------------------------------------------------------------- */
 #ifndef MDS_LOG_COMPRESS_ARGS_NUMS
 #define MDS_LOG_COMPRESS_ARGS_NUMS 7
 #endif
@@ -30,85 +92,17 @@
 #define MDS_LOG_COMPRESS_ARG_FIX(x) ((x == 0xFFFFFFFF) ? (0xBDC5CA39) : (x))
 #endif
 
-/* Variable ---------------------------------------------------------------- */
-static size_t g_logPrintLevel = MDS_LOG_PRINT_LEVEL;
-static size_t g_logCompressPsn = 0;
-static void (*g_logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap) = NULL;
-
-/* Function ---------------------------------------------------------------- */
-size_t MDS_LOG_GetPrintLevel(void)
+size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, size_t cnt, const char *fmt,
+                                va_list ap)
 {
-    return (g_logPrintLevel);
-}
+    static size_t logCompressPsn = 0;
 
-void MDS_LOG_SetPrintLevel(size_t level)
-{
-    g_logPrintLevel = level;
-}
-
-void MDS_LOG_Register(void (*logVaPrintf)(size_t level, const void *fmt, size_t cnt, va_list ap))
-{
-    g_logVaPrintf = logVaPrintf;
-}
-
-__attribute__((weak)) void MDS_LOG_VaPrintf(size_t level, const void *fmt, size_t cnt, va_list ap)
-{
-    if (g_logVaPrintf != NULL) {
-        g_logVaPrintf(level, fmt, cnt, ap);
-    }
-}
-
-void MDS_LOG_Printf(size_t level, const void *fmt, size_t cnt, ...)
-{
-    va_list ap;
-
-    if (level > MDS_LOG_GetPrintLevel()) {
-        return;
-    }
-
-    va_start(ap, cnt);
-    MDS_LOG_VaPrintf(level, fmt, cnt, ap);
-    va_end(ap);
-}
-
-__attribute__((weak)) void MDS_CorePanicTrace(void)
-{
-    __attribute__((unused)) void *caller = __builtin_return_address(0);
-
-    MDS_LOG_F("[PANIC] caller:%p,%p", caller, __builtin_extract_return_addr(caller));
-}
-
-__attribute__((noreturn)) void MDS_PanicPrintf(const char *fmt, ...)
-{
-    va_list ap;
-
-    va_start(ap, fmt);
-    MDS_LOG_VaPrintf(MDS_LOG_LEVEL_FATAL, fmt, 0, ap);
-    va_end(ap);
-
-    MDS_CorePanicTrace();
-
-    for (;;) {
-    }
-}
-
-__attribute__((noreturn)) void MDS_AssertPrintf(const char *assertion, const char *function)
-{
-    __attribute__((unused)) void *caller = __builtin_return_address(0);
-
-    MDS_PanicPrintf("[ASSERT] '%s' in function:'%s' caller:%p,%p", assertion, function, caller,
-                    __builtin_extract_return_addr(caller));
-}
-
-/* Compress ---------------------------------------------------------------- */
-size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, va_list ap)
-{
     if (log == NULL) {
         return (0);
     }
 
     MDS_Item_t lock = MDS_CoreInterruptLock();
-    g_logCompressPsn++;
+    logCompressPsn++;
     MDS_CoreInterruptRestore(lock);
 
     if (cnt > MDS_LOG_COMPRESS_ARGS_NUMS) {
@@ -119,7 +113,7 @@ size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, const cha
     log->address = (uintptr_t)fmt & 0x00FFFFFF;
     log->level = level;
     log->count = cnt;
-    log->psn = g_logCompressPsn;
+    log->psn = logCompressPsn;
     log->timestamp = MDS_ClockGetTimestamp(NULL);
 
     for (size_t idx = 0; idx < cnt; idx++) {
@@ -130,12 +124,13 @@ size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, const cha
     return (sizeof(MDS_LOG_Compress_t) - (sizeof(uint32_t) * (MDS_LOG_COMPRESS_ARGS_NUMS + cnt)));
 }
 
-size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, const char *fmt, size_t cnt, ...)
+size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, size_t cnt,
+                                   const char *fmt, ...)
 {
     va_list ap;
 
-    va_start(ap, cnt);
-    size_t len = MDS_LOG_CompressStructVa(log, level, fmt, cnt, ap);
+    va_start(ap, fmt);
+    size_t len = MDS_LOG_CompressStructVa(log, level, cnt, fmt, ap);
     va_end(ap);
 
     return (len);

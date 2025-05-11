@@ -19,11 +19,7 @@ MDS_HOOK_INIT(TIMER_START, MDS_Timer_t *timer);
 MDS_HOOK_INIT(TIMER_STOP, MDS_Timer_t *timer);
 
 /* Define ------------------------------------------------------------------ */
-#if (defined(MDS_TIMER_DEBUG_ENABLE) && (MDS_TIMER_DEBUG_ENABLE > 0))
-#define MDS_TIMER_DEBUG(fmt, args...) MDS_LOG_D(fmt, ##args)
-#else
-#define MDS_TIMER_DEBUG(fmt, args...)
-#endif
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 #ifndef MDS_TIMER_THREAD_PRIORITY
 #define MDS_TIMER_THREAD_PRIORITY 0
@@ -40,7 +36,7 @@ MDS_HOOK_INIT(TIMER_STOP, MDS_Timer_t *timer);
 /* Variable ---------------------------------------------------------------- */
 static MDS_ListNode_t g_sysTimerSkipList[MDS_TIMER_SKIPLIST_LEVEL];
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE > 0))
+#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
 static struct MDS_threadTimer {
     MDS_ListNode_t skipList[MDS_TIMER_SKIPLIST_LEVEL];
     uint8_t stack[MDS_TIMER_THREAD_STACKSIZE];
@@ -84,7 +80,7 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size, bool isSoft)
 
         MDS_HOOK_CALL(TIMER_ENTER, t);
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE > 0))
+#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
         if (t->entry != NULL) {
             if (isSoft) {
                 g_threadTimer.isBusy = true;
@@ -105,7 +101,8 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size, bool isSoft)
 
         MDS_HOOK_CALL(TIMER_EXIT, t);
 
-        MDS_TIMER_DEBUG("timer(%p) entry:%p flag:%x exit current tick:%u", t, t->entry, t->flags, currTick);
+        MDS_LOG_D("[timer]timer(%p) entry:%p flag:%x exit current tick:%lu", t, t->entry, t->flags,
+                  currTick);
 
         if (MDS_ListIsEmpty(&runList)) {
             continue;
@@ -135,16 +132,18 @@ static MDS_Timer_t *TIMER_NextTickoutTimer(MDS_ListNode_t timerList[], size_t si
     return (timer);
 }
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE > 0))
+#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
 static __attribute__((noreturn)) void TIMER_ThreadEntry(MDS_Arg_t *arg)
 {
     UNUSED(arg);
 
     MDS_LOOP {
-        MDS_Timer_t *nextTimer = TIMER_NextTickoutTimer(g_threadTimer.skipList, ARRAY_SIZE(g_threadTimer.skipList));
-        MDS_Tick_t nextTick = (nextTimer != NULL) ? (nextTimer->ticklimit) : (MDS_CLOCK_TICK_FOREVER);
+        MDS_Timer_t *nextTimer = TIMER_NextTickoutTimer(g_threadTimer.skipList,
+                                                        ARRAY_SIZE(g_threadTimer.skipList));
+        MDS_Tick_t nextTick = (nextTimer != NULL) ? (nextTimer->ticklimit)
+                                                  : (MDS_CLOCK_TICK_FOREVER);
 
-        MDS_TIMER_DEBUG("soft timer thread take a next check:%u", nextTick);
+        MDS_LOG_D("[timer]soft timer thread take a next check:%lu", nextTick);
 
         if (nextTick == MDS_CLOCK_TICK_FOREVER) {
             MDS_Thread_t *thread = MDS_KernelCurrentThread();
@@ -163,7 +162,8 @@ static __attribute__((noreturn)) void TIMER_ThreadEntry(MDS_Arg_t *arg)
 }
 #endif
 
-MDS_Err_t MDS_TimerInit(MDS_Timer_t *timer, const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry, MDS_Arg_t *arg)
+MDS_Err_t MDS_TimerInit(MDS_Timer_t *timer, const char *name, MDS_Mask_t type,
+                        MDS_TimerEntry_t entry, MDS_Arg_t *arg)
 {
     MDS_ASSERT(timer != NULL);
 
@@ -174,7 +174,7 @@ MDS_Err_t MDS_TimerInit(MDS_Timer_t *timer, const char *name, MDS_Mask_t type, M
         timer->arg = arg;
         timer->flags = type & (~MDS_TIMER_FLAG_ACTIVED);
     } else {
-        MDS_TIMER_DEBUG("timer entry:%p type:%x init failed", entry, type);
+        MDS_LOG_E("[timer]timer entry:%p type:%x init failed", entry, type);
     }
 
     return (err);
@@ -187,16 +187,18 @@ MDS_Err_t MDS_TimerDeInit(MDS_Timer_t *timer)
     return (MDS_ObjectDeInit(&(timer->object)));
 }
 
-MDS_Timer_t *MDS_TimerCreate(const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry, MDS_Arg_t *arg)
+MDS_Timer_t *MDS_TimerCreate(const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry,
+                             MDS_Arg_t *arg)
 {
-    MDS_Timer_t *timer = (MDS_Timer_t *)MDS_ObjectCreate(sizeof(MDS_Timer_t), MDS_OBJECT_TYPE_TIMER, name);
+    MDS_Timer_t *timer = (MDS_Timer_t *)MDS_ObjectCreate(sizeof(MDS_Timer_t),
+                                                         MDS_OBJECT_TYPE_TIMER, name);
     if (timer != NULL) {
         MDS_SkipListInitNode(timer->node, ARRAY_SIZE(timer->node));
         timer->entry = entry;
         timer->arg = arg;
         timer->flags = type & (~MDS_TIMER_FLAG_ACTIVED);
     } else {
-        MDS_TIMER_DEBUG("timer entry:%p type:%x create failed", entry, type);
+        MDS_LOG_E("[timer]timer entry:%p type:%x create failed", entry, type);
     }
 
     return (timer);
@@ -219,9 +221,10 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
     }
 
     static size_t skipRand = 0;
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE > 0))
-    MDS_ListNode_t *timerList = ((timer->flags & MDS_TIMER_TYPE_SYSTEM) == 0U) ? (g_threadTimer.skipList)
-                                                                               : (g_sysTimerSkipList);
+#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
+    MDS_ListNode_t *timerList = ((timer->flags & MDS_TIMER_TYPE_SYSTEM) == 0U)
+                                    ? (g_threadTimer.skipList)
+                                    : (g_sysTimerSkipList);
 #else
     MDS_ListNode_t *timerList = g_sysTimerSkipList;
 #endif
@@ -241,17 +244,19 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
             MDS_HOOK_CALL(TIMER_START, timer);
 
             MDS_ListNode_t *skipNode[ARRAY_SIZE(timer->node)];
-            MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node), &(timer->ticklimit),
-                                   TIMER_SkipListCompare);
+            MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node),
+                                   &(timer->ticklimit), TIMER_SkipListCompare);
 
             skipRand = skipRand + timer->tickstart + 1;
-            MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand, MDS_TIMER_SKIPLIST_SHIFT);
+            MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand,
+                                   MDS_TIMER_SKIPLIST_SHIFT);
             timer->flags |= MDS_TIMER_FLAG_ACTIVED;
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE > 0))
+#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
             if (((timer->flags & MDS_TIMER_TYPE_SYSTEM) == 0U) &&
                 ((!(g_threadTimer.isBusy)) &&
-                 ((g_threadTimer.thread.state & MDS_THREAD_STATE_MASK) == MDS_THREAD_STATE_BLOCKED))) {
+                 ((g_threadTimer.thread.state & MDS_THREAD_STATE_MASK) ==
+                  MDS_THREAD_STATE_BLOCKED))) {
                 MDS_ThreadResume(&(g_threadTimer.thread));
                 MDS_CoreInterruptRestore(lock);
                 MDS_KernelSchedulerCheck();
@@ -263,8 +268,8 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
         MDS_CoreInterruptRestore(lock);
     } while (0);
 
-    MDS_TIMER_DEBUG("timer(%p) entry:%p flag:%x start timeout:%u tick on:%u out:%u", timer, timer->entry, timer->flags,
-                    timeout, timer->tickstart, timer->ticklimit);
+    MDS_LOG_D("[timer]timer(%p) entry:%p flag:%x start timeout:%lu tick on:%lu out:%lu", timer,
+              timer->entry, timer->flags, timeout.ticks, timer->tickstart, timer->ticklimit);
 
     return (MDS_EOK);
 }
@@ -284,7 +289,7 @@ MDS_Err_t MDS_TimerStop(MDS_Timer_t *timer)
 
         MDS_CoreInterruptRestore(lock);
 
-        MDS_TIMER_DEBUG("timer(%p) entry:%p flag:%x stop", timer, timer->entry, timer->flags);
+        MDS_LOG_D("[timer]timer(%p) entry:%p flag:%x stop", timer, timer->entry, timer->flags);
     }
 
     return (MDS_EOK);
@@ -306,11 +311,12 @@ void MDS_SysTimerInit(void)
 {
     MDS_SkipListInitNode(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE > 0))
+#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
     MDS_SkipListInitNode(g_threadTimer.skipList, ARRAY_SIZE(g_threadTimer.skipList));
 
-    MDS_Err_t err = MDS_ThreadInit(&(g_threadTimer.thread), "timer", TIMER_ThreadEntry, NULL, &(g_threadTimer.stack),
-                                   sizeof(g_threadTimer.stack), MDS_TIMER_THREAD_PRIORITY, MDS_TIMER_THREAD_TICKS);
+    MDS_Err_t err = MDS_ThreadInit(&(g_threadTimer.thread), "timer", TIMER_ThreadEntry, NULL,
+                                   &(g_threadTimer.stack), sizeof(g_threadTimer.stack),
+                                   MDS_TIMER_THREAD_PRIORITY, MDS_TIMER_THREAD_TICKS);
     if (err == MDS_EOK) {
         MDS_ThreadStartup(&(g_threadTimer.thread));
     } else {
@@ -328,20 +334,11 @@ MDS_Tick_t MDS_SysTimerNextTick(void)
 {
     MDS_Tick_t ticknext = MDS_CLOCK_TICK_FOREVER;
 
-    MDS_Timer_t *timer = TIMER_NextTickoutTimer(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
+    MDS_Timer_t *timer = TIMER_NextTickoutTimer(g_sysTimerSkipList,
+                                                ARRAY_SIZE(g_sysTimerSkipList));
     if (timer != NULL) {
         ticknext = timer->ticklimit;
     }
-
-#if (defined(MDS_TIMER_DEBUG_ENABLE) && (MDS_TIMER_DEBUG_ENABLE > 0))
-    static MDS_Timer_t *lastTimer = NULL;
-    if (lastTimer != NULL) {
-        MDS_Tick_t currTick = MDS_SysTickGetCount();
-        MDS_TIMER_DEBUG("next timer(%p) entry:%p currTick:%u nextTick:%u diffTick:%u", timer, timer->entry, currTick,
-                        timer->ticklimit, timer->ticklimit - currTick);
-    }
-    lastTimer = timer;
-#endif
 
     return (ticknext);
 }

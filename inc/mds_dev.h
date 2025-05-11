@@ -91,20 +91,23 @@ typedef struct MDS_DevDumpData {
 
 /* Function ---------------------------------------------------------------- */
 MDS_Device_t *MDS_DeviceFind(const char *name);
-void MDS_DeviceRegisterHook(const MDS_Device_t *device, void (*hook)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd));
+void MDS_DeviceRegisterHook(const MDS_Device_t *device,
+                            void (*hook)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd));
 
-MDS_Err_t MDS_DevModuleInit(MDS_DevModule_t *module, const char *name, const MDS_DevDriver_t *driver,
-                            MDS_DevHandle_t *handle, const MDS_Arg_t *init);
+MDS_Err_t MDS_DevModuleInit(MDS_DevModule_t *module, const char *name,
+                            const MDS_DevDriver_t *driver, MDS_DevHandle_t *handle,
+                            const MDS_Arg_t *init);
 MDS_Err_t MDS_DevModuleDeInit(MDS_DevModule_t *module);
-MDS_DevModule_t *MDS_DevModuleCreate(size_t typesz, const char *name, const MDS_DevDriver_t *driver,
-                                     const MDS_Arg_t *init);
+MDS_DevModule_t *MDS_DevModuleCreate(size_t typesz, const char *name,
+                                     const MDS_DevDriver_t *driver, const MDS_Arg_t *init);
 MDS_Err_t MDS_DevModuleDestroy(MDS_DevModule_t *module);
 
-MDS_Err_t MDS_DevAdaptrInit(MDS_DevAdaptr_t *adaptr, const char *name, const MDS_DevDriver_t *driver,
-                            MDS_DevHandle_t *handle, const MDS_Arg_t *init);
+MDS_Err_t MDS_DevAdaptrInit(MDS_DevAdaptr_t *adaptr, const char *name,
+                            const MDS_DevDriver_t *driver, MDS_DevHandle_t *handle,
+                            const MDS_Arg_t *init);
 MDS_Err_t MDS_DevAdaptrDeInit(MDS_DevAdaptr_t *adaptr);
-MDS_DevAdaptr_t *MDS_DevAdaptrCreate(size_t typesz, const char *name, const MDS_DevDriver_t *driver,
-                                     const MDS_Arg_t *init);
+MDS_DevAdaptr_t *MDS_DevAdaptrCreate(size_t typesz, const char *name,
+                                     const MDS_DevDriver_t *driver, const MDS_Arg_t *init);
 MDS_Err_t MDS_DevAdaptrDestroy(MDS_DevAdaptr_t *adaptr);
 MDS_Err_t MDS_DevAdaptrUpdateOpen(MDS_DevAdaptr_t *adaptr);
 
@@ -124,9 +127,9 @@ MDS_Device_t *MDS_DeviceProbeDrivers(const MDS_DevDriver_t **driver, const MDS_D
                                      const MDS_DevProbeTable_t drvList[], size_t drvSize);
 
 /* Define ------------------------------------------------------------------ */
-#define MDS_DEVICE_ARG_HANDLE_SIZE(arg, handleT)                                                                       \
-    if ((arg) != NULL) {                                                                                               \
-        *((size_t *)(arg)) = sizeof(handleT);                                                                          \
+#define MDS_DEVICE_ARG_HANDLE_SIZE(arg, handleT)                                                  \
+    if ((arg) != NULL) {                                                                          \
+        *((size_t *)(arg)) = sizeof(handleT);                                                     \
     }
 
 #ifdef __cplusplus

@@ -16,17 +16,18 @@
 #include "mds_def.h"
 #include "mds_log.h"
 
-#ifdef MDS_CONFIG_FILE
-#include MDS_CONFIG_FILE
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* Config ------------------------------------------------------------------ */
+#ifndef CONFIG_MDS_KERNEL_LOG_LEVEL
+#define CONFIG_MDS_KERNEL_LOG_LEVEL MDS_LOG_LEVEL_WRN
+#endif
+
 /* Init -------------------------------------------------------------------- */
 #ifndef MDS_INIT_SECTION
-#define MDS_INIT_SECTION ".mds.init."
+#define MDS_INIT_SECTION ".init.mdsInit."
 #endif
 
 #define MDS_INIT_PRIORITY_0 "0."
@@ -42,18 +43,17 @@ extern "C" {
 
 typedef void (*MDS_InitFunc_t)(void);
 
-#define MDS_INIT_IMPORT(priority, func)                                                                                \
-    static const                                                                                                       \
-        __attribute__((used, section(MDS_INIT_SECTION priority #func))) MDS_InitFunc_t __MDS_INIT_##func = (func)
+#define MDS_INIT_IMPORT(priority, func)                                                           \
+    static __attribute__((used, section(MDS_INIT_SECTION priority #func)))                        \
+    const MDS_InitFunc_t __MDS_INIT_##func = (func)
 
 static inline void MDS_InitExport(void)
 {
-    static const __attribute__((section(MDS_INIT_SECTION "\000"))) void *initBegin = NULL;
-    static const __attribute__((section(MDS_INIT_SECTION "\177"))) void *initLimit = NULL;
-    const MDS_InitFunc_t *initStart = (const MDS_InitFunc_t *)((uintptr_t)(&initBegin) + sizeof(void *));
-    const MDS_InitFunc_t *initEnd = (const MDS_InitFunc_t *)((uintptr_t)(&initLimit));
+    static __attribute__((section(MDS_INIT_SECTION "\000"))) const void *initBegin = NULL;
+    static __attribute__((section(MDS_INIT_SECTION "\177"))) const void *initLimit = NULL;
 
-    for (const MDS_InitFunc_t *init = initStart; init < initEnd; init++) {
+    for (const MDS_InitFunc_t *init = (MDS_InitFunc_t *)((uintptr_t)(&initBegin) + sizeof(void *));
+         init < (MDS_InitFunc_t *)(&initLimit); init++) {
         if (*init != NULL) {
             (*init)();
         }
@@ -114,9 +114,9 @@ typedef struct MDS_Timeout {
     MDS_Tick_t ticks;
 } MDS_Timeout_t;
 
-#define MDS_TIMEOUT_TICKS(t) ((MDS_Timeout_t){.ticks = (MDS_Tick_t)(t)})
-#define MDS_TIMEOUT_NO_WAIT MDS_TIMEOUT_TICKS(MDS_CLOCK_TICK_NO_WAIT)
-#define MDS_TIMEOUT_FOREVER MDS_TIMEOUT_TICKS(MDS_CLOCK_TICK_FOREVER)
+#define MDS_TIMEOUT_TICKS(t) ((MDS_Timeout_t) {.ticks = (MDS_Tick_t)(t)})
+#define MDS_TIMEOUT_NO_WAIT  MDS_TIMEOUT_TICKS(MDS_CLOCK_TICK_NO_WAIT)
+#define MDS_TIMEOUT_FOREVER  MDS_TIMEOUT_TICKS(MDS_CLOCK_TICK_FOREVER)
 
 #define MDS_TIMEOUT_MS(t) MDS_TIMEOUT_TICKS(((t) * MDS_CLOCK_TICK_FREQ_HZ / MDS_TIME_MSEC_OF_SEC))
 #define MDS_TIMEOUT_US(t) MDS_TIMEOUT_TICKS(((t) * MDS_CLOCK_TICK_FREQ_HZ / MDS_TIME_USEC_OF_SEC))
@@ -221,9 +221,11 @@ struct MDS_Timer {
     MDS_Tick_t ticklimit;
 };
 
-MDS_Err_t MDS_TimerInit(MDS_Timer_t *timer, const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry, MDS_Arg_t *arg);
+MDS_Err_t MDS_TimerInit(MDS_Timer_t *timer, const char *name, MDS_Mask_t type,
+                        MDS_TimerEntry_t entry, MDS_Arg_t *arg);
 MDS_Err_t MDS_TimerDeInit(MDS_Timer_t *timer);
-MDS_Timer_t *MDS_TimerCreate(const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry, MDS_Arg_t *arg);
+MDS_Timer_t *MDS_TimerCreate(const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry,
+                             MDS_Arg_t *arg);
 MDS_Err_t MDS_TimerDestroy(MDS_Timer_t *timer);
 MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout);
 MDS_Err_t MDS_TimerStop(MDS_Timer_t *timer);
@@ -271,16 +273,17 @@ struct MDS_Thread {
     uint8_t eventOpt;
     MDS_Mask_t eventMask;
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE > 0))
+#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
     void *stackWater;
 #endif
 };
 
-MDS_Err_t MDS_ThreadInit(MDS_Thread_t *thread, const char *name, MDS_ThreadEntry_t entry, MDS_Arg_t *arg,
-                         void *stackPool, size_t stackSize, MDS_ThreadPriority_t priority, MDS_Tick_t ticks);
+MDS_Err_t MDS_ThreadInit(MDS_Thread_t *thread, const char *name, MDS_ThreadEntry_t entry,
+                         MDS_Arg_t *arg, void *stackPool, size_t stackSize,
+                         MDS_ThreadPriority_t priority, MDS_Tick_t ticks);
 MDS_Err_t MDS_ThreadDeInit(MDS_Thread_t *thread);
-MDS_Thread_t *MDS_ThreadCreate(const char *name, MDS_ThreadEntry_t entry, MDS_Arg_t *arg, size_t stackSize,
-                               MDS_ThreadPriority_t priority, MDS_Tick_t ticks);
+MDS_Thread_t *MDS_ThreadCreate(const char *name, MDS_ThreadEntry_t entry, MDS_Arg_t *arg,
+                               size_t stackSize, MDS_ThreadPriority_t priority, MDS_Tick_t ticks);
 MDS_Err_t MDS_ThreadDestroy(MDS_Thread_t *thread);
 MDS_Err_t MDS_ThreadStartup(MDS_Thread_t *thread);
 MDS_Err_t MDS_ThreadResume(MDS_Thread_t *thread);
@@ -367,7 +370,8 @@ MDS_Err_t MDS_EventInit(MDS_Event_t *event, const char *name);
 MDS_Err_t MDS_EventDeInit(MDS_Event_t *event);
 MDS_Event_t *MDS_EventCreate(const char *name);
 MDS_Err_t MDS_EventDestroy(MDS_Event_t *event);
-MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv, MDS_Timeout_t timeout);
+MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv,
+                        MDS_Timeout_t timeout);
 MDS_Err_t MDS_EventSet(MDS_Event_t *event, MDS_Mask_t mask);
 MDS_Err_t MDS_EventClr(MDS_Event_t *event, MDS_Mask_t mask);
 MDS_Mask_t MDS_EventGetValue(const MDS_Event_t *event);
@@ -386,15 +390,20 @@ struct MDS_MsgQueue {
     void *ltail;
 };
 
-MDS_Err_t MDS_MsgQueueInit(MDS_MsgQueue_t *msgQueue, const char *name, void *queBuff, size_t bufSize, size_t msgSize);
+MDS_Err_t MDS_MsgQueueInit(MDS_MsgQueue_t *msgQueue, const char *name, void *queBuff,
+                           size_t bufSize, size_t msgSize);
 MDS_Err_t MDS_MsgQueueDeInit(MDS_MsgQueue_t *msgQueue);
 MDS_MsgQueue_t *MDS_MsgQueueCreate(const char *name, size_t msgSize, size_t msgNums);
 MDS_Err_t MDS_MsgQueueDestroy(MDS_MsgQueue_t *msgQueue);
-MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *len, MDS_Timeout_t timeout);
+MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *len,
+                                  MDS_Timeout_t timeout);
 MDS_Err_t MDS_MsgQueueRecvRelease(MDS_MsgQueue_t *msgQueue, void *recv);
-MDS_Err_t MDS_MsgQueueRecvCopy(MDS_MsgQueue_t *msgQueue, void *buff, size_t size, size_t *len, MDS_Timeout_t timeout);
-MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msgList, MDS_Timeout_t timeout);
-MDS_Err_t MDS_MsgQueueSend(MDS_MsgQueue_t *msgQueue, const void *buff, size_t len, MDS_Timeout_t timeout);
+MDS_Err_t MDS_MsgQueueRecvCopy(MDS_MsgQueue_t *msgQueue, void *buff, size_t size, size_t *len,
+                               MDS_Timeout_t timeout);
+MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msgList,
+                              MDS_Timeout_t timeout);
+MDS_Err_t MDS_MsgQueueSend(MDS_MsgQueue_t *msgQueue, const void *buff, size_t len,
+                           MDS_Timeout_t timeout);
 MDS_Err_t MDS_MsgQueueUrgentMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msgList);
 MDS_Err_t MDS_MsgQueueUrgent(MDS_MsgQueue_t *msgQueue, const void *buff, size_t len);
 size_t MDS_MsgQueueGetMsgSize(const MDS_MsgQueue_t *msgQueue);
@@ -412,7 +421,8 @@ struct MDS_MemPool {
     void *lfree;
 };
 
-MDS_Err_t MDS_MemPoolInit(MDS_MemPool_t *memPool, const char *name, void *memBuff, size_t bufSize, size_t blkSize);
+MDS_Err_t MDS_MemPoolInit(MDS_MemPool_t *memPool, const char *name, void *memBuff, size_t bufSize,
+                          size_t blkSize);
 MDS_Err_t MDS_MemPoolDeInit(MDS_MemPool_t *memPool);
 MDS_MemPool_t *MDS_MemPoolCreate(const char *name, size_t blkSize, size_t blkNums);
 MDS_Err_t MDS_MemPoolDestroy(MDS_MemPool_t *memPool);
@@ -439,7 +449,7 @@ typedef struct MDS_MemHeap {
     MDS_Semaphore_t lock;
     const MDS_MemHeapOps_t *ops;
     void *begin, *limit;
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE > 0))
+#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
     MDS_MemHeapSize_t size;
 #endif
 } MDS_MemHeap_t;
@@ -457,8 +467,9 @@ extern const MDS_MemHeapOps_t G_MDS_MEMHEAP_OPS_LLFF;
 extern const MDS_MemHeapOps_t G_MDS_MEMHEAP_OPS_TLSF;
 
 /* Hook -------------------------------------------------------------------- */
-#if (defined(MDS_KERNEL_HOOK_ENABLE) && (MDS_KERNEL_HOOK_ENABLE > 0))
-void MDS_HOOK_SCHEDULER_SWITCH_Register(void (*hook)(MDS_Thread_t *toThread, MDS_Thread_t *fromThread));
+#if (defined(MDS_KERNEL_HOOK_ENABLE) && (MDS_KERNEL_HOOK_ENABLE != 0))
+void MDS_HOOK_SCHEDULER_SWITCH_Register(void (*hook)(MDS_Thread_t *toThread,
+                                                     MDS_Thread_t *fromThread));
 
 void MDS_HOOK_TIMER_ENTER_Register(void (*hook)(MDS_Timer_t *timer));
 void MDS_HOOK_TIMER_EXIT_Register(void (*hook)(MDS_Timer_t *timer));
@@ -470,8 +481,10 @@ void MDS_HOOK_THREAD_EXIT_Register(void (*hook)(MDS_Thread_t *thread));
 void MDS_HOOK_THREAD_RESUME_Register(void (*hook)(MDS_Thread_t *thread));
 void MDS_HOOK_THREAD_SUSPEND_Register(void (*hook)(MDS_Thread_t *thread));
 
-void MDS_HOOK_SEMAPHORE_TRY_ACQUIRE_Register(void (*hook)(MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout));
-void MDS_HOOK_SEMAPHORE_HAS_ACQUIRE_Register(void (*hook)(MDS_Semaphore_t *semaphore, MDS_Err_t err));
+void MDS_HOOK_SEMAPHORE_TRY_ACQUIRE_Register(void (*hook)(MDS_Semaphore_t *semaphore,
+                                                          MDS_Timeout_t timeout));
+void MDS_HOOK_SEMAPHORE_HAS_ACQUIRE_Register(void (*hook)(MDS_Semaphore_t *semaphore,
+                                                          MDS_Err_t err));
 void MDS_HOOK_SEMAPHORE_HAS_RELEASE_Register(void (*hook)(MDS_Semaphore_t *semaphore));
 
 void MDS_HOOK_MUTEX_TRY_ACQUIRE_Register(void (*hook)(MDS_Mutex_t *mutex, MDS_Timeout_t timeout));
@@ -483,33 +496,37 @@ void MDS_HOOK_EVENT_HAS_ACQUIRE_Register(void (*hook)(MDS_Event_t *event, MDS_Er
 void MDS_HOOK_EVENT_HAS_SET_Register(void (*hook)(MDS_Event_t *event, MDS_Mask_t mask));
 void MDS_HOOK_EVENT_HAS_CLR_Register(void (*hook)(MDS_Event_t *event, MDS_Mask_t mask));
 
-void MDS_HOOK_MSGQUEUE_TRY_RECV_Register(void (*hook)(MDS_MsgQueue_t *msgQueue, MDS_Timeout_t timeout));
+void MDS_HOOK_MSGQUEUE_TRY_RECV_Register(void (*hook)(MDS_MsgQueue_t *msgQueue,
+                                                      MDS_Timeout_t timeout));
 void MDS_HOOK_MSGQUEUE_HAS_RECV_Register(void (*hook)(MDS_MsgQueue_t *msgQueue, MDS_Err_t err));
-void MDS_HOOK_MSGQUEUE_TRY_SEND_Register(void (*hook)(MDS_MsgQueue_t *msgQueue, MDS_Timeout_t timeout));
+void MDS_HOOK_MSGQUEUE_TRY_SEND_Register(void (*hook)(MDS_MsgQueue_t *msgQueue,
+                                                      MDS_Timeout_t timeout));
 void MDS_HOOK_MSGQUEUE_HAS_SEND_Register(void (*hook)(MDS_MsgQueue_t *msgQueue, MDS_Err_t err));
 
-void MDS_HOOK_MEMPOOL_TRY_ALLOC_Register(void (*hook)(MDS_MemPool_t *memPool, MDS_Timeout_t timeout));
+void MDS_HOOK_MEMPOOL_TRY_ALLOC_Register(void (*hook)(MDS_MemPool_t *memPool,
+                                                      MDS_Timeout_t timeout));
 void MDS_HOOK_MEMPOOL_HAS_ALLOC_Register(void (*hook)(MDS_MemPool_t *memPool, void *ptr));
 void MDS_HOOK_MEMPOOL_HAS_FREE_Register(void (*hook)(MDS_MemPool_t *memPool, void *ptr));
 
-void MDS_HOOK_MEMHEAP_INIT_Register(void (*hook)(MDS_MemHeap_t *memheap, void *heapBegin, void *heapLimit,
-                                                 size_t metaSize));
+void MDS_HOOK_MEMHEAP_INIT_Register(void (*hook)(MDS_MemHeap_t *memheap, void *heapBegin,
+                                                 void *heapLimit, size_t metaSize));
 void MDS_HOOK_MEMHEAP_ALLOC_Register(void (*hook)(MDS_MemHeap_t *memheap, void *ptr, size_t size));
 void MDS_HOOK_MEMHEAP_FREE_Register(void (*hook)(MDS_MemHeap_t *memheap, void *ptr));
-void MDS_HOOK_MEMHEAP_REALLOC_Register(void (*hook)(MDS_MemHeap_t *memheap, void *old, void *new, size_t size));
+void MDS_HOOK_MEMHEAP_REALLOC_Register(void (*hook)(MDS_MemHeap_t *memheap, void *old, void *new,
+                                                    size_t size));
 
-#define MDS_HOOK_INIT(type, ...)                                                                                       \
-    static void (*g_hook_##type)(__VA_ARGS__) = NULL;                                                                  \
-    void MDS_HOOK_##type##_Register(void (*hook)(__VA_ARGS__))                                                         \
-    {                                                                                                                  \
-        g_hook_##type = hook;                                                                                          \
+#define MDS_HOOK_INIT(type, ...)                                                                  \
+    static void (*g_hook_##type)(__VA_ARGS__) = NULL;                                             \
+    void MDS_HOOK_##type##_Register(void (*hook)(__VA_ARGS__))                                    \
+    {                                                                                             \
+        g_hook_##type = hook;                                                                     \
     }
 
-#define MDS_HOOK_CALL(type, ...)                                                                                       \
-    do {                                                                                                               \
-        if (g_hook_##type != NULL) {                                                                                   \
-            g_hook_##type(__VA_ARGS__);                                                                                \
-        }                                                                                                              \
+#define MDS_HOOK_CALL(type, ...)                                                                  \
+    do {                                                                                          \
+        if (g_hook_##type != NULL) {                                                              \
+            g_hook_##type(__VA_ARGS__);                                                           \
+        }                                                                                         \
     } while (0)
 
 #define MDS_HOOK_REGISTER(type, ...) MDS_HOOK_##type##_Register(__VA_ARGS__)

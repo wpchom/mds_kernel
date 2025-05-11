@@ -20,7 +20,8 @@ extern "C" {
 #endif
 
 /* Core -------------------------------------------------------------------- */
-void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg, void *exit);
+void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg,
+                              void *exit);
 void MDS_CoreSchedulerStartup(void *toSP);
 void MDS_CoreSchedulerSwitch(void *from, void *to);
 bool MDS_CoreThreadStackCheck(void *sp);

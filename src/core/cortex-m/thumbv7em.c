@@ -13,9 +13,11 @@
 #include "mds_sys.h"
 
 /* Define ----------------------------------------------------------------- */
-#if ((defined(__CC_ARM) && defined(__TARGET_FPU_VFP)) ||                                                               \
-     (defined(__clang__) && defined(__VFP_FP__) && !defined(__SOFTFP__)) ||                                            \
-     (defined(__ICCARM__) && defined(__ARMVFP__)) ||                                                                   \
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
+
+#if ((defined(__CC_ARM) && defined(__TARGET_FPU_VFP)) ||                                          \
+     (defined(__clang__) && defined(__VFP_FP__) && !defined(__SOFTFP__)) ||                       \
+     (defined(__ICCARM__) && defined(__ARMVFP__)) ||                                              \
      (defined(__GNUC__) && defined(__VFP_FP__) && !defined(__SOFTFP__)))
 #define CORE_WITH_FPU 1
 #else
@@ -185,7 +187,8 @@ inline void MDS_CoreInterruptRestore(MDS_Item_t lock)
 }
 
 /* CoreThread -------------------------------------------------------------- */
-void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg, void *exit)
+void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg,
+                              void *exit)
 {
     uintptr_t sp = VALUE_ALIGN((uintptr_t)(stackBase) + stackSize, sizeof(uint64_t));
     struct StackFrame *stack = (struct StackFrame *)(sp - sizeof(struct StackFrame));
@@ -217,18 +220,19 @@ bool MDS_CoreThreadStackCheck(MDS_Thread_t *thread)
 
     if (((*(uint8_t *)(thread->stackBase)) != '@') ||
         ((uintptr_t)(thread->stackPoint) <= (uintptr_t)(thread->stackBase)) ||
-        ((uintptr_t)(thread->stackPoint) > ((uintptr_t)(thread->stackBase) + (uintptr_t)(thread->stackSize)))) {
+        ((uintptr_t)(thread->stackPoint) >
+         ((uintptr_t)(thread->stackBase) + (uintptr_t)(thread->stackSize)))) {
         return (false);
     }
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE > 0))
+#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
 #endif
 
     return (true);
 }
 
 /* CoreScheduler ----------------------------------------------------------- */
-#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX > 0))
+#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
 static struct CoreScheduler {
     uintptr_t swflag;
     uintptr_t *fromSP;
@@ -300,9 +304,8 @@ __attribute__((naked)) void PendSV_Handler(void)
 
 #if CORE_WITH_FPU
     // exc_return[4] == 0
-    __asm volatile("tst         lr, #0x10       \n"
-                   "it          eq              \n"
-                   "vstmdbeq    r3!, {d8 - d15} \n");
+    __asm volatile(
+        "tst         lr, #0x10       \n" "it          eq              \n" "vstmdbeq    r3!, {d8 - d15} \n");
 #endif
 
     __asm volatile("stmfd       r3!, {r4 - r11}");
@@ -329,9 +332,8 @@ __attribute__((naked)) void PendSV_Handler(void)
 
 #if CORE_WITH_FPU
     // exc_return[4] == 0
-    __asm volatile("tst         lr, #0x10       \n"
-                   "it          eq              \n"
-                   "vldmiaeq    r3!, {d8 - d15} \n");
+    __asm volatile(
+        "tst         lr, #0x10       \n" "it          eq              \n" "vldmiaeq    r3!, {d8 - d15} \n");
 #endif
 
     __asm volatile("msr         psp, r3");
@@ -349,7 +351,7 @@ __attribute__((naked)) void PendSV_Handler(void)
 #endif
 
 /* Backtrace --------------------------------------------------------------- */
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH > 0))
+#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH != 0))
 __attribute__((weak)) bool MDS_CoreStackPointerInCode(uintptr_t pc)
 {
 #if defined(__IAR_SYSTEMS_ICC__)
@@ -385,10 +387,11 @@ static bool CORE_DisassemblyInsIsBL(uintptr_t addr)
 
 static void CORE_StackBacktrace(uintptr_t stackPoint, uintptr_t stackLimit, size_t depth)
 {
-    for (size_t dp = 0; (dp < depth) && (stackPoint < stackLimit); stackPoint += sizeof(uintptr_t)) {
+    for (size_t dp = 0; (dp < depth) && (stackPoint < stackLimit);
+         stackPoint += sizeof(uintptr_t)) {
         uintptr_t pc = *((uintptr_t *)stackPoint) - sizeof(uintptr_t) - 1;
         if (MDS_CoreStackPointerInCode(pc) && CORE_DisassemblyInsIsBL(pc)) {
-            MDS_LOG_F("[BACKTRACE] %d: %p", dp, pc);
+            MDS_LOG_F("[BACKTRACE] %d: %p", dp, (void *)pc);
             dp += 1;
         }
     }
@@ -405,18 +408,19 @@ __attribute__((weak)) void MDS_CoreExceptionCallback(bool exit)
 
 static void CORE_ExceptionBacktrace(void)
 {
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH > 0))
+#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH != 0))
     uintptr_t msp = CORE_GetMSP();
     const uintptr_t **SCB_VTOR_STACK = (const uintptr_t **)0xE000ED08;
-    MDS_LOG_F("msp:%p stacklimit:%p backtrace", msp, **SCB_VTOR_STACK);
+    MDS_LOG_F("msp:%p stacklimit:%p backtrace", (void *)msp, (void *)**SCB_VTOR_STACK);
     CORE_StackBacktrace(msp, **SCB_VTOR_STACK, MDS_CORE_BACKTRACE_DEPTH);
 
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
     if (thread != NULL) {
         uintptr_t psp = CORE_GetPSP();
-        MDS_LOG_F("current thread(%p) entry:%p psp:%p stackbase:%p stacksize:%u backtrace", thread, thread->entry, psp,
-                  thread->stackBase, thread->stackSize);
-        CORE_StackBacktrace(psp, (uintptr_t)(thread->stackBase) + thread->stackSize, MDS_CORE_BACKTRACE_DEPTH);
+        MDS_LOG_F("current thread(%p) entry:%p psp:%p stackbase:%p stacksize:%u backtrace", thread,
+                  thread->entry, (void *)psp, thread->stackBase, thread->stackSize);
+        CORE_StackBacktrace(psp, (uintptr_t)(thread->stackBase) + thread->stackSize,
+                            MDS_CORE_BACKTRACE_DEPTH);
     }
 #endif
 }
@@ -437,15 +441,19 @@ static __attribute__((noreturn)) void MDS_CoreHardFaultException(struct Exceptio
     if (g_exceptionContext == NULL) {
         g_exceptionContext = &(excInfo->stack);
 
-        MDS_LOG_F("[HARDFAULT] on ipsr:%u exc_return:%x", MDS_CoreInterruptCurrent(), excInfo->exc_return);
-        MDS_LOG_F("r0 :%p r1 :%p r2 :%p r3 :%p ", g_exceptionContext->exception.r0, g_exceptionContext->exception.r1,
-                  g_exceptionContext->exception.r2, g_exceptionContext->exception.r3);
-        MDS_LOG_F("r4 :%p r5 :%p r6 :%p r7 :%p ", g_exceptionContext->r4, g_exceptionContext->r5,
-                  g_exceptionContext->r6, g_exceptionContext->r7);
-        MDS_LOG_F("r8 :%p r9 :%p r10:%p r11:%p ", g_exceptionContext->r8, g_exceptionContext->r9,
-                  g_exceptionContext->r10, g_exceptionContext->r11);
-        MDS_LOG_F("r12:%p lr :%p pc :%p psr:%p ", g_exceptionContext->exception.r12, g_exceptionContext->exception.lr,
-                  g_exceptionContext->exception.pc, g_exceptionContext->exception.psr);
+        MDS_LOG_F("[HARDFAULT] on ipsr:%u exc_return:%lx", MDS_CoreInterruptCurrent(),
+                  excInfo->exc_return);
+        // MDS_LOG_F("r0 :%p r1 :%p r2 :%p r3 :%p ", g_exceptionContext->exception.r0,
+        //           g_exceptionContext->exception.r1, g_exceptionContext->exception.r2,
+        //           g_exceptionContext->exception.r3);
+        // MDS_LOG_F("r4 :%p r5 :%p r6 :%p r7 :%p ", g_exceptionContext->r4,
+        //           g_exceptionContext->r5, g_exceptionContext->r6, g_exceptionContext->r7);
+        // MDS_LOG_F("r8 :%p r9 :%p r10:%p r11:%p ", g_exceptionContext->r8,
+        //           g_exceptionContext->r9, g_exceptionContext->r10,
+        //           g_exceptionContext->r11);
+        // MDS_LOG_F("r12:%p lr :%p pc :%p psr:%p ", g_exceptionContext->exception.r12,
+        //           g_exceptionContext->exception.lr, g_exceptionContext->exception.pc,
+        //           g_exceptionContext->exception.psr);
 
         CORE_ExceptionBacktrace();
     }
@@ -459,16 +467,13 @@ static __attribute__((noreturn)) void MDS_CoreHardFaultException(struct Exceptio
 __attribute__((naked, noreturn)) void HardFault_Handler(void)
 {
     // exc_return[2] == 0
-    __asm volatile("tst         lr, #0x04       \n"
-                   "ite         eq              \n"
-                   "mrseq       r0, msp         \n"
-                   "mrsne       r0, psp         \n");
+    __asm volatile(
+        "tst         lr, #0x04       \n" "ite         eq              \n" "mrseq       r0, msp         \n" "mrsne       r0, psp         \n");
 
 #if CORE_WITH_FPU
     // exc_return[4] == 0
-    __asm volatile("tst         lr, #0x10       \n"
-                   "it          eq              \n"
-                   "vstmdbeq    r0!, {d8 - d15} \n");
+    __asm volatile(
+        "tst         lr, #0x10       \n" "it          eq              \n" "vstmdbeq    r0!, {d8 - d15} \n");
 #endif
 
     __asm volatile("stmfd       r0!, {r4 - r11}");

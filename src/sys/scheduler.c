@@ -13,11 +13,7 @@
 #include "kernel.h"
 
 /* Define ------------------------------------------------------------------ */
-#if (defined(MDS_SCHEDULER_DEBUG_ENABLE) && (MDS_SCHEDULER_DEBUG_ENABLE > 0))
-#define MDS_SCHEDULER_DEBUG(fmt, args...) MDS_LOG_D(fmt, ##args)
-#else
-#define MDS_SCHEDULER_DEBUG(fmt, args...)
-#endif
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 /* MLFQ Scheduler ---------------------------------------------------------- */
 #if (MDS_KERNEL_THREAD_PRIORITY_MAX > 32)
@@ -67,7 +63,7 @@ __attribute__((weak)) size_t MDS_SchedulerFFS(uint32_t value)
 
 void MDS_SchedulerInit(void)
 {
-    MDS_SCHEDULER_DEBUG("scheduler init with max priority:%u", ARRAY_SIZE(g_sysSchedulerTable));
+    MDS_LOG_D("[scheduler]init with max priority:%u", ARRAY_SIZE(g_sysSchedulerTable));
 
     g_sysThreadPrioMask = 0U;
     MDS_SkipListInitNode(g_sysSchedulerTable, ARRAY_SIZE(g_sysSchedulerTable));
@@ -93,14 +89,14 @@ void MDS_SchedulerInsertThread(MDS_Thread_t *thread)
         g_sysThreadPrioMask |= (1UL << thread->currPrio);
     }
 
-    MDS_SCHEDULER_DEBUG("scheduler insert thread(%p) entry:%p sp:%u priority:%u", thread, thread->entry,
-                        thread->stackPoint, thread->currPrio);
+    MDS_LOG_D("[scheduler] insert thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry,
+              thread->stackPoint, thread->currPrio);
 }
 
 void MDS_SchedulerRemoveThread(MDS_Thread_t *thread)
 {
-    MDS_SCHEDULER_DEBUG("scheduler remove thread(%p) entry:%p sp:%u priority:%u", thread, thread->entry,
-                        thread->stackPoint, thread->currPrio);
+    MDS_LOG_D("[scheduler] remove thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry,
+              thread->stackPoint, thread->currPrio);
 
     MDS_ListRemoveNode(&(thread->node));
 

@@ -12,6 +12,9 @@
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
 
+/* Define ------------------------------------------------------------------ */
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
+
 /* Function ---------------------------------------------------------------- */
 MDS_Err_t MDS_MemHeapInit(MDS_MemHeap_t *memheap, const char *name, void *base, size_t size,
                           const MDS_MemHeapOps_t *ops)
@@ -38,7 +41,7 @@ MDS_Err_t MDS_MemHeapInit(MDS_MemHeap_t *memheap, const char *name, void *base, 
 
         if (err == MDS_EOK) {
             memheap->ops = ops;
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE > 0))
+#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
             memheap->size.max = 0;
             memheap->size.cur = 0;
             memheap->size.total = size;

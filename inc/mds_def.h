@@ -19,6 +19,10 @@
 #include <stdarg.h>
 #include <string.h>
 
+#ifdef MDS_CONFIG_FILE
+#include MDS_CONFIG_FILE
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -144,21 +148,25 @@ static inline size_t MDS_ListGetLength(const MDS_ListNode_t *list)
     return (len);
 }
 
-#define MDS_LIST_FOREACH_NEXT(iter, member, head)                                                                      \
-    for ((iter) = CONTAINER_OF((head)->next, __typeof__(*(iter)), member); &((iter)->member) != (head);                \
+#define MDS_LIST_FOREACH_NEXT(iter, member, head)                                                 \
+    for ((iter) = CONTAINER_OF((head)->next, __typeof__(*(iter)), member);                        \
+         &((iter)->member) != (head);                                                             \
          (iter) = CONTAINER_OF((iter)->member.next, __typeof__(*(iter)), member))
 
-#define MDS_LIST_FOREACH_PREV(iter, member, head)                                                                      \
-    for ((iter) = CONTAINER_OF((head)->prev, __typeof__(*(iter)), member); &((iter)->member) != (head);                \
+#define MDS_LIST_FOREACH_PREV(iter, member, head)                                                 \
+    for ((iter) = CONTAINER_OF((head)->prev, __typeof__(*(iter)), member);                        \
+         &((iter)->member) != (head);                                                             \
          (iter) = CONTAINER_OF((iter)->member.prev, __typeof__(*(iter)), member))
 
 /* Skip List --------------------------------------------------------------- */
 void MDS_SkipListInitNode(MDS_ListNode_t node[], size_t size);
 void MDS_SkipListRemoveNode(MDS_ListNode_t node[], size_t size);
 bool MDS_SkipListIsEmpty(MDS_ListNode_t node[], size_t size);
-MDS_ListNode_t *MDS_SkipListSearchNode(MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size, const void *value,
-                                       int (*compare)(const MDS_ListNode_t *node, const void *value));
-size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size, size_t rand, size_t shift);
+MDS_ListNode_t *MDS_SkipListSearchNode(
+    MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size, const void *value,
+    int (*compare)(const MDS_ListNode_t *node, const void *value));
+size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size,
+                              size_t rand, size_t shift);
 
 /* Tree -------------------------------------------------------------------- */
 typedef struct MDS_TreeNode {
@@ -170,8 +178,8 @@ typedef struct MDS_TreeNode {
 void MDS_TreeInitNode(MDS_TreeNode_t *node);
 MDS_TreeNode_t *MDS_TreeInsertNode(MDS_TreeNode_t *parent, MDS_TreeNode_t *node);
 MDS_TreeNode_t *MDS_TreeRemoveNode(MDS_TreeNode_t *node);
-size_t MDS_TreeForeachNode(const MDS_TreeNode_t *tree, void (*func)(const MDS_TreeNode_t *, MDS_Arg_t *),
-                           MDS_Arg_t *arg);
+size_t MDS_TreeForeachNode(const MDS_TreeNode_t *tree,
+                           void (*func)(const MDS_TreeNode_t *, MDS_Arg_t *), MDS_Arg_t *arg);
 
 /* Message ----------------------------------------------------------------- */
 typedef struct MDS_MsgList {

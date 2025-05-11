@@ -13,7 +13,7 @@
 #include "mds_sys.h"
 
 /* Timer ------------------------------------------------------------------- */
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
 static MDS_ListNode_t g_sysTimerSkipList[MDS_TIMER_SKIPLIST_LEVEL];
 
 static int TIMER_SkipListCompare(const MDS_ListNode_t *node, const void *value)
@@ -80,7 +80,8 @@ static MDS_Timer_t *TIMER_NextTickoutTimer(MDS_ListNode_t timerList[], size_t si
     return (timer);
 }
 
-MDS_Err_t MDS_TimerInit(MDS_Timer_t *timer, const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry, MDS_Arg_t *arg)
+MDS_Err_t MDS_TimerInit(MDS_Timer_t *timer, const char *name, MDS_Mask_t type,
+                        MDS_TimerEntry_t entry, MDS_Arg_t *arg)
 {
     MDS_ASSERT(timer != NULL);
 
@@ -102,9 +103,11 @@ MDS_Err_t MDS_TimerDeInit(MDS_Timer_t *timer)
     return (MDS_ObjectDeInit(&(timer->object)));
 }
 
-MDS_Timer_t *MDS_TimerCreate(const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry, MDS_Arg_t *arg)
+MDS_Timer_t *MDS_TimerCreate(const char *name, MDS_Mask_t type, MDS_TimerEntry_t entry,
+                             MDS_Arg_t *arg)
 {
-    MDS_Timer_t *timer = (MDS_Timer_t *)MDS_ObjectCreate(sizeof(MDS_Timer_t), MDS_OBJECT_TYPE_TIMER, name);
+    MDS_Timer_t *timer = (MDS_Timer_t *)MDS_ObjectCreate(sizeof(MDS_Timer_t),
+                                                         MDS_OBJECT_TYPE_TIMER, name);
     if (timer != NULL) {
         MDS_SkipListInitNode(timer->node, ARRAY_SIZE(timer->node));
         timer->entry = entry;
@@ -145,11 +148,12 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
             timer->ticklimit = timer->tickstart + timeout.ticks;
 
             MDS_ListNode_t *skipNode[ARRAY_SIZE(timer->node)];
-            MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node), &(timer->ticklimit),
-                                   TIMER_SkipListCompare);
+            MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node),
+                                   &(timer->ticklimit), TIMER_SkipListCompare);
 
             skipRand = skipRand + timer->tickstart + 1;
-            MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand, MDS_TIMER_SKIPLIST_SHIFT);
+            MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand,
+                                   MDS_TIMER_SKIPLIST_SHIFT);
             timer->flags |= MDS_TIMER_FLAG_ACTIVED;
         }
 
@@ -191,14 +195,14 @@ bool MDS_TimerIsActived(const MDS_Timer_t *timer)
 
 void MDS_SysTimerInit(void)
 {
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
     MDS_SkipListInitNode(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 #endif
 }
 
 void MDS_SysTimerCheck(void)
 {
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
     TIMER_Check(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 #endif
 }
@@ -207,8 +211,9 @@ MDS_Tick_t MDS_SysTimerNextTick(void)
 {
     MDS_Tick_t ticknext = MDS_CLOCK_TICK_FOREVER;
 
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT > 0))
-    MDS_Timer_t *timer = TIMER_NextTickoutTimer(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
+#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
+    MDS_Timer_t *timer = TIMER_NextTickoutTimer(g_sysTimerSkipList,
+                                                ARRAY_SIZE(g_sysTimerSkipList));
     if (timer != NULL) {
         ticknext = timer->ticklimit;
     }
@@ -242,7 +247,8 @@ MDS_Err_t MDS_SemaphoreDeInit(MDS_Semaphore_t *semaphore)
 
 MDS_Semaphore_t *MDS_SemaphoreCreate(const char *name, size_t init, size_t max)
 {
-    MDS_Semaphore_t *semaphore = (MDS_Semaphore_t *)MDS_ObjectCreate(sizeof(MDS_Semaphore_t), MDS_OBJECT_TYPE_SEMAPHORE,
+    MDS_Semaphore_t *semaphore = (MDS_Semaphore_t *)MDS_ObjectCreate(sizeof(MDS_Semaphore_t),
+                                                                     MDS_OBJECT_TYPE_SEMAPHORE,
                                                                      name);
     if (semaphore != NULL) {
         semaphore->value = init;
@@ -341,7 +347,8 @@ MDS_Err_t MDS_MutexDeInit(MDS_Mutex_t *mutex)
 
 MDS_Mutex_t *MDS_MutexCreate(const char *name)
 {
-    MDS_Mutex_t *mutex = (MDS_Mutex_t *)MDS_ObjectCreate(sizeof(MDS_Mutex_t), MDS_OBJECT_TYPE_MUTEX, name);
+    MDS_Mutex_t *mutex = (MDS_Mutex_t *)MDS_ObjectCreate(sizeof(MDS_Mutex_t),
+                                                         MDS_OBJECT_TYPE_MUTEX, name);
     if (mutex != NULL) {
         mutex->owner = NULL;
         mutex->priority = MDS_KERNEL_THREAD_PRIORITY_MAX;
@@ -429,7 +436,8 @@ MDS_Err_t MDS_EventDeInit(MDS_Event_t *event)
 
 MDS_Event_t *MDS_EventCreate(const char *name)
 {
-    MDS_Event_t *event = (MDS_Event_t *)MDS_ObjectCreate(sizeof(MDS_Event_t), MDS_OBJECT_TYPE_EVENT, name);
+    MDS_Event_t *event = (MDS_Event_t *)MDS_ObjectCreate(sizeof(MDS_Event_t),
+                                                         MDS_OBJECT_TYPE_EVENT, name);
     if (event != NULL) {
         event->value = 0U;
         MDS_ListInitNode(&(event->list));
@@ -446,11 +454,13 @@ MDS_Err_t MDS_EventDestroy(MDS_Event_t *event)
     return (MDS_ObjectDestory(&(event->object)));
 }
 
-MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv, MDS_Timeout_t timeout)
+MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv,
+                        MDS_Timeout_t timeout)
 {
     MDS_ASSERT(event != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(event->object)) == MDS_OBJECT_TYPE_EVENT);
-    MDS_ASSERT((opt & (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR)) != (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR));
+    MDS_ASSERT((opt & (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR)) !=
+               (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR));
 
     if ((mask == 0U) || ((opt & (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR)) == 0U)) {
         return (MDS_EINVAL);
