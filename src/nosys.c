@@ -13,8 +13,8 @@
 #include "mds_sys.h"
 
 /* Timer ------------------------------------------------------------------- */
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
-static MDS_ListNode_t g_sysTimerSkipList[MDS_TIMER_SKIPLIST_LEVEL];
+#if (defined(CONFIG_MDS_TIMER_INDEPENDENT) && (CONFIG_MDS_TIMER_INDEPENDENT != 0))
+static MDS_ListNode_t g_sysTimerSkipList[CONFIG_MDS_TIMER_SKIPLIST_LEVEL];
 
 static int TIMER_SkipListCompare(const MDS_ListNode_t *node, const void *value)
 {
@@ -153,7 +153,7 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
 
             skipRand = skipRand + timer->tickstart + 1;
             MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand,
-                                   MDS_TIMER_SKIPLIST_SHIFT);
+                                   CONFIG_MDS_TIMER_SKIPLIST_SHIFT);
             timer->flags |= MDS_TIMER_FLAG_ACTIVED;
         }
 
@@ -195,14 +195,14 @@ bool MDS_TimerIsActived(const MDS_Timer_t *timer)
 
 void MDS_SysTimerInit(void)
 {
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
+#if (defined(CONFIG_MDS_TIMER_INDEPENDENT) && (CONFIG_MDS_TIMER_INDEPENDENT != 0))
     MDS_SkipListInitNode(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 #endif
 }
 
 void MDS_SysTimerCheck(void)
 {
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
+#if (defined(CONFIG_MDS_TIMER_INDEPENDENT) && (CONFIG_MDS_TIMER_INDEPENDENT != 0))
     TIMER_Check(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 #endif
 }
@@ -211,7 +211,7 @@ MDS_Tick_t MDS_SysTimerNextTick(void)
 {
     MDS_Tick_t ticknext = MDS_CLOCK_TICK_FOREVER;
 
-#if (defined(MDS_TIMER_INDEPENDENT) && (MDS_TIMER_INDEPENDENT != 0))
+#if (defined(CONFIG_MDS_TIMER_INDEPENDENT) && (CONFIG_MDS_TIMER_INDEPENDENT != 0))
     MDS_Timer_t *timer = TIMER_NextTickoutTimer(g_sysTimerSkipList,
                                                 ARRAY_SIZE(g_sysTimerSkipList));
     if (timer != NULL) {
@@ -328,7 +328,7 @@ MDS_Err_t MDS_MutexInit(MDS_Mutex_t *mutex, const char *name)
     MDS_Err_t err = MDS_ObjectInit(&(mutex->object), MDS_OBJECT_TYPE_MUTEX, name);
     if (err == MDS_EOK) {
         mutex->owner = NULL;
-        mutex->priority = MDS_KERNEL_THREAD_PRIORITY_MAX;
+        mutex->priority = CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX;
         mutex->value = 1;
         mutex->nest = 0;
         MDS_ListInitNode(&(mutex->list));
@@ -351,7 +351,7 @@ MDS_Mutex_t *MDS_MutexCreate(const char *name)
                                                          MDS_OBJECT_TYPE_MUTEX, name);
     if (mutex != NULL) {
         mutex->owner = NULL;
-        mutex->priority = MDS_KERNEL_THREAD_PRIORITY_MAX;
+        mutex->priority = CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX;
         mutex->value = 1;
         mutex->nest = 0;
         MDS_ListInitNode(&(mutex->list));
@@ -590,8 +590,8 @@ void MDS_KernelCompensateTick(MDS_Tick_t ticks)
 
 /* Clock ------------------------------------------------------------------- */
 static volatile MDS_Tick_t g_sysClockTickCount = 0U;
-static int8_t g_unixTimeZone = MDS_CLOCK_TIMEZONE_DEFAULT;
-static MDS_Time_t g_unixTimeBase = MDS_CLOCK_TIMESTAMP_DEFAULT;
+static int8_t g_unixTimeZone = CONFIG_MDS_CLOCK_TIMEZONE_DEFAULT;
+static MDS_Time_t g_unixTimeBase = CONFIG_MDS_CLOCK_TIMESTAMP_DEFAULT;
 
 MDS_Tick_t MDS_ClockGetTickCount(void)
 {

@@ -12,13 +12,6 @@
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
 
-/* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(MEMHEAP_INIT, MDS_MemHeap_t *memheap, void *heapBegin, void *heapLimit,
-              size_t metaSize);
-MDS_HOOK_INIT(MEMHEAP_ALLOC, MDS_MemHeap_t *memheap, void *ptr, size_t size);
-MDS_HOOK_INIT(MEMHEAP_FREE, MDS_MemHeap_t *memheap, void *ptr);
-MDS_HOOK_INIT(MEMHEAP_REALLOC, MDS_MemHeap_t *memheap, void *old, void *new, size_t size);
-
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
@@ -105,8 +98,9 @@ static MDS_Err_t MDS_MemHeapLLFF_Setup(MDS_MemHeap_t *memheap, void *heapBase, s
     limit->prev = lfree;
     limit->next = lfree;
 
-    MDS_HOOK_CALL(MEMHEAP_INIT, memheap, (void *)alignBegin, (void *)alignLimit,
-                  sizeof(MemHeapLLFF_Node_t));
+    MDS_HOOK_CALL(KERNEL, memheap,
+                  (memheap, MDS_KERNEL_TRACE_MEMHEAP_INIT, (void *)alignBegin, (void *)alignLimit,
+                   sizeof(MemHeapLLFF_Node_t)));
 
     MDS_LOG_D("[memory]memheap(%p) init begin:%p limit:%p size:%u", memheap, (void *)alignBegin,
               (void *)alignLimit, alignLimit - alignBegin);
@@ -116,7 +110,7 @@ static MDS_Err_t MDS_MemHeapLLFF_Setup(MDS_MemHeap_t *memheap, void *heapBase, s
 
 static void MemHeapLLFF_NodeFree(MDS_MemHeap_t *memheap, MemHeapLLFF_Node_t *node)
 {
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
     memheap->size.cur -= (uintptr_t)(node->next) - (uintptr_t)(node);
 #endif
 
@@ -133,7 +127,9 @@ static void MemHeapLLFF_NodeFree(MDS_MemHeap_t *memheap, MemHeapLLFF_Node_t *nod
         memheap->begin = (void *)node;
     }
 
-    MDS_HOOK_CALL(MEMHEAP_FREE, memheap, (uint8_t *)node);
+    MDS_HOOK_CALL(KERNEL, memheap,
+                  (memheap, MDS_KERNEL_TRACE_MEMHEAP_FREE, NULL, node,
+                   (uintptr_t)(node->next) - (uintptr_t)(node) - sizeof(MemHeapLLFF_Node_t)));
 
     MDS_LOG_D("[memory]memheap(%p) free node:%p size:%u", memheap, node,
               (uintptr_t)(node->next) - (uintptr_t)(node) - sizeof(MemHeapLLFF_Node_t));
@@ -174,7 +170,7 @@ static MemHeapLLFF_Node_t *MemHeapLLFF_NodeAlloc(MDS_MemHeap_t *memheap, size_t 
             MemHeapLLFF_NodeSplit(node, next);
         }
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
         memheap->size.cur += (uintptr_t)(node->next) - (uintptr_t)(node);
         if (memheap->size.cur > memheap->size.max) {
             memheap->size.max = memheap->size.cur;
@@ -183,8 +179,9 @@ static MemHeapLLFF_Node_t *MemHeapLLFF_NodeAlloc(MDS_MemHeap_t *memheap, size_t 
 
         MemHeapLLFF_RelistFree(memheap, lfree);
 
-        MDS_HOOK_CALL(MEMHEAP_ALLOC, memheap, (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
-                      alignSize);
+        MDS_HOOK_CALL(KERNEL, memheap,
+                      (memheap, MDS_KERNEL_TRACE_MEMHEAP_ALLOC,
+                       (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), NULL, alignSize));
 
         MDS_LOG_D("[memory]memheap(%p) first:%p alloc node:%p size:%u", memheap, limit->next, node,
                   alignSize);
@@ -231,22 +228,28 @@ static MemHeapLLFF_Node_t *MemHeapLLFF_NodeRealloc(MDS_MemHeap_t *memheap,
                 MemHeapLLFF_NodeFree(memheap, node);
             }
 
-            MDS_HOOK_CALL(MEMHEAP_REALLOC, memheap, (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
-                          (uint8_t *)next + sizeof(MemHeapLLFF_Node_t), alignSize);
+            MDS_HOOK_CALL(KERNEL, memheap,
+                          (memheap, MDS_KERNEL_TRACE_MEMHEAP_REALLOC,
+                           (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
+                           (uint8_t *)next + sizeof(MemHeapLLFF_Node_t), alignSize));
 
             return (next);
         } else {
             MemHeapLLFF_NodeCombine(node);
 
-            MDS_HOOK_CALL(MEMHEAP_REALLOC, memheap, (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
-                          (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), alignSize);
+            MDS_HOOK_CALL(KERNEL, memheap,
+                          (memheap, MDS_KERNEL_TRACE_MEMHEAP_REALLOC,
+                           (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
+                           (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), alignSize));
 
             MDS_LOG_D("[memory]memheap(%p) realloc node:%p extend size:%u->%u", memheap, node,
                       nodeSize, hopeSize);
         }
     } else {
-        MDS_HOOK_CALL(MEMHEAP_REALLOC, memheap, (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
-                      (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), alignSize);
+        MDS_HOOK_CALL(KERNEL, memheap,
+                      (memheap, MDS_KERNEL_TRACE_MEMHEAP_REALLOC,
+                       (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
+                       (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), alignSize));
 
         MDS_LOG_D("[memory]memheap(%p) realloc node:%p reduce size:%u->%u", memheap, node,
                   nodeSize, hopeSize);
@@ -261,7 +264,7 @@ static MemHeapLLFF_Node_t *MemHeapLLFF_NodeRealloc(MDS_MemHeap_t *memheap,
         }
     }
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
     memheap->size.cur += ((uintptr_t)(node->next) - (uintptr_t)(node)) - nodeSize;
     if (memheap->size.cur > memheap->size.max) {
         memheap->size.max = memheap->size.cur;
@@ -294,7 +297,7 @@ static void *MDS_MemHeapLLFF_Realloc(MDS_MemHeap_t *memheap, void *ptr, size_t s
 
 static void MDS_MemHeapLLFF_Size(MDS_MemHeap_t *memheap, MDS_MemHeapSize_t *size)
 {
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
     if (size != NULL) {
         *size = memheap->size;
     }

@@ -12,12 +12,6 @@
 /* Include ----------------------------------------------------------------- */
 #include "kernel.h"
 
-/* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(THREAD_EXIT, MDS_Thread_t *thread);
-MDS_HOOK_INIT(THREAD_INIT, MDS_Thread_t *thread);
-MDS_HOOK_INIT(THREAD_RESUME, MDS_Thread_t *thread);
-MDS_HOOK_INIT(THREAD_SUSPEND, MDS_Thread_t *thread);
-
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
@@ -48,7 +42,7 @@ static void THREAD_Entry(void *arg)
 
     THREAD_Terminate(thread);
 
-    MDS_HOOK_CALL(THREAD_EXIT, thread);
+    MDS_HOOK_CALL(KERNEL, thread, (thread, MDS_KERNEL_TRACE_THREAD_EXIT));
 
     MDS_KernelSchedulerCheck();
 }
@@ -112,7 +106,7 @@ static MDS_Err_t THREAD_Init(MDS_Thread_t *thread, MDS_ThreadEntry_t entry, MDS_
                                   MDS_TIMER_TYPE_ONCE | MDS_TIMER_TYPE_SYSTEM, THREAD_Timeout,
                                   (MDS_Arg_t *)thread);
 
-    MDS_HOOK_CALL(THREAD_INIT, thread);
+    MDS_HOOK_CALL(KERNEL, thread, (thread, MDS_KERNEL_TRACE_THREAD_INIT));
 
     return (err);
 }
@@ -223,7 +217,7 @@ MDS_Err_t MDS_ThreadResume(MDS_Thread_t *thread)
 
     MDS_CoreInterruptRestore(lock);
 
-    MDS_HOOK_CALL(THREAD_RESUME, thread);
+    MDS_HOOK_CALL(KERNEL, thread, (thread, MDS_KERNEL_TRACE_THREAD_RESUME));
 
     return (MDS_EOK);
 }
@@ -241,7 +235,7 @@ MDS_Err_t MDS_ThreadSuspend(MDS_Thread_t *thread)
         return (MDS_EAGAIN);
     }
 
-    MDS_HOOK_CALL(THREAD_SUSPEND, thread);
+    MDS_HOOK_CALL(KERNEL, thread, (thread, MDS_KERNEL_TRACE_THREAD_SUSPEND));
 
     MDS_Item_t lock = MDS_CoreInterruptLock();
 

@@ -12,16 +12,15 @@
 /* Include ----------------------------------------------------------------- */
 #include "kernel.h"
 
-/* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(SCHEDULER_SWITCH, MDS_Thread_t *toThread, MDS_Thread_t *fromThread);
-
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
+MDS_HOOK_INIT(KERNEL, __attribute__((weak)) MDS_HOOK_Kernel_t, ());
 
 /* Variable ---------------------------------------------------------------- */
 static volatile int g_sysCriticalNest = 0;
 static MDS_Thread_t *g_sysCurrThread = NULL;
-static MDS_ListNode_t g_sysDefunctList = {.prev = &g_sysDefunctList, .next = &g_sysDefunctList};
+static MDS_ListNode_t g_sysDefunctList = {.prev = &g_sysDefunctList,
+                                          .next = &g_sysDefunctList};
 
 /* Function ---------------------------------------------------------------- */
 void MDS_KernelSchedulerCheck(void)
@@ -60,26 +59,26 @@ void MDS_KernelSchedulerCheck(void)
             }
 
             MDS_SchedulerRemoveThread(toThread);
-            toThread->state = (toThread->state & ~MDS_THREAD_STATE_MASK) |
-                              MDS_THREAD_STATE_RUNNING;
+            toThread->state =
+                (toThread->state & ~MDS_THREAD_STATE_MASK) | MDS_THREAD_STATE_RUNNING;
 
             MDS_LOG_D(
                 "[kernel]switch to thread(%p) entry:%p sp:%p priority:%u from thread(%p) entry:%p sp:%p",
-                toThread, toThread->entry, toThread->stackPoint, toThread->currPrio, currThread,
-                currThread->entry, currThread->stackPoint);
+                toThread, toThread->entry, toThread->stackPoint, toThread->currPrio,
+                currThread, currThread->entry, currThread->stackPoint);
 
             if (!MDS_CoreThreadStackCheck(toThread)) {
                 MDS_PANIC("switch to thread(%p) entry:%p stack:%p has broken", toThread,
                           toThread->entry, toThread->stackPoint);
             }
 
-            MDS_HOOK_CALL(SCHEDULER_SWITCH, toThread, currThread);
+            MDS_HOOK_CALL(KERNEL, scheduler, (toThread, currThread));
 
             MDS_CoreSchedulerSwitch(&(currThread->stackPoint), &(toThread->stackPoint));
         } else {
             MDS_SchedulerRemoveThread(toThread);
-            toThread->state = (toThread->state & ~MDS_THREAD_STATE_MASK) |
-                              MDS_THREAD_STATE_RUNNING;
+            toThread->state =
+                (toThread->state & ~MDS_THREAD_STATE_MASK) | MDS_THREAD_STATE_RUNNING;
         }
     } while (0);
 
@@ -88,8 +87,8 @@ void MDS_KernelSchedulerCheck(void)
 
 void MDS_KernelPushDefunct(MDS_Thread_t *thread)
 {
-    MDS_LOG_D("[kernel]push defunct thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry,
-              thread->stackPoint, thread->currPrio);
+    MDS_LOG_D("[kernel]push defunct thread(%p) entry:%p sp:%p priority:%u", thread,
+              thread->entry, thread->stackPoint, thread->currPrio);
 
     MDS_ListInsertNodePrev(&g_sysDefunctList, &(thread->node));
 }
@@ -147,8 +146,9 @@ void MDS_KernelStartup(void)
     g_sysCurrThread = toThread;
     toThread->state = MDS_THREAD_STATE_RUNNING;
 
-    MDS_LOG_D("[kernel]scheduler thread startup with thread(%p) entry:%p sp:%p priority:%u",
-              toThread, toThread->entry, toThread->stackPoint, toThread->currPrio);
+    MDS_LOG_D(
+        "[kernel]scheduler thread startup with thread(%p) entry:%p sp:%p priority:%u",
+        toThread, toThread->entry, toThread->stackPoint, toThread->currPrio);
 
     MDS_CoreSchedulerStartup(&(toThread->stackPoint));
 }

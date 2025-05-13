@@ -41,7 +41,7 @@ MDS_Err_t MDS_MemHeapInit(MDS_MemHeap_t *memheap, const char *name, void *base, 
 
         if (err == MDS_EOK) {
             memheap->ops = ops;
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
             memheap->size.max = 0;
             memheap->size.cur = 0;
             memheap->size.total = size;
@@ -159,8 +159,8 @@ extern void MDS_MemHeapSize(MDS_MemHeap_t *memheap, MDS_MemHeapSize_t *size)
 }
 
 /* SysMem ------------------------------------------------------------------ */
-#ifndef MDS_SYSMEM_HEAP_OPS
-#define MDS_SYSMEM_HEAP_OPS G_MDS_MEMHEAP_OPS_LLFF
+#ifndef CONFIG_MDS_SYSMEM_HEAP_OPS
+#define CONFIG_MDS_SYSMEM_HEAP_OPS G_MDS_MEMHEAP_OPS_LLFF
 #endif
 
 static MDS_MemHeap_t g_sysMemHeap;
@@ -197,7 +197,7 @@ void MDS_SysMemInit(void)
         return;
     }
 
-    MDS_MemHeapInit(&g_sysMemHeap, "sysmem", buff, size, &MDS_SYSMEM_HEAP_OPS);
+    MDS_MemHeapInit(&g_sysMemHeap, "sysmem", buff, size, &CONFIG_MDS_SYSMEM_HEAP_OPS);
 }
 
 void MDS_SysMemFree(void *ptr)

@@ -16,13 +16,13 @@
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 /* MLFQ Scheduler ---------------------------------------------------------- */
-#if (MDS_KERNEL_THREAD_PRIORITY_MAX > 32)
+#if (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX > 32)
 #error "kernel mlfq scheduler supported max priority 32-bit / 64-bit"
 #endif
 
 /* Variable ---------------------------------------------------------------- */
 static volatile uint32_t g_sysThreadPrioMask = 0x00U;
-static MDS_ListNode_t g_sysSchedulerTable[MDS_KERNEL_THREAD_PRIORITY_MAX];
+static MDS_ListNode_t g_sysSchedulerTable[CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX];
 
 /* Function ---------------------------------------------------------------- */
 __attribute__((weak)) size_t MDS_SchedulerFFS(uint32_t value)
@@ -80,7 +80,7 @@ void MDS_SchedulerInsertThread(MDS_Thread_t *thread)
 
     MDS_ListRemoveNode(&(thread->node));
 
-    if (thread->currPrio < MDS_KERNEL_THREAD_PRIORITY_MAX) {
+    if (thread->currPrio < CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) {
         if ((thread->state & MDS_THREAD_FLAG_YIELD) != 0U) {
             MDS_ListInsertNodePrev(&(g_sysSchedulerTable[thread->currPrio]), &(thread->node));
         } else {
@@ -100,7 +100,7 @@ void MDS_SchedulerRemoveThread(MDS_Thread_t *thread)
 
     MDS_ListRemoveNode(&(thread->node));
 
-    if ((thread->currPrio < MDS_KERNEL_THREAD_PRIORITY_MAX) &&
+    if ((thread->currPrio < CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&
         (MDS_ListIsEmpty(&(g_sysSchedulerTable[thread->currPrio])))) {
         g_sysThreadPrioMask &= ~(1UL << thread->currPrio);
     }

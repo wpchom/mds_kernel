@@ -392,14 +392,15 @@ bool MDS_CoreThreadStackCheck(MDS_Thread_t *thread)
         return (false);
     }
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
 #endif
 
     return (true);
 }
 
 /* CoreScheduler ----------------------------------------------------------- */
-#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
+#if (defined(CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&                                            \
+     (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
 static struct CoreScheduler {
     uintptr_t swflag;
     uintptr_t *fromSP;
@@ -480,7 +481,7 @@ void MDS_CoreSchedulerSwitch(void *fromSP, void *toSP)
 #endif
 
 /* Backtrace --------------------------------------------------------------- */
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH != 0))
+#if (defined(CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (CONFIG_MDS_CORE_BACKTRACE_DEPTH != 0))
 __attribute__((weak)) bool MDS_CoreStackPointerInCode(uintptr_t pc)
 {
 #if defined(__IAR_SYSTEMS_ICC__)
@@ -527,7 +528,7 @@ static uintptr_t CORE_DisassemblyInsIsBL(uintptr_t addr)
 
 static void CORE_StackBacktrace(uintptr_t stackPoint, uintptr_t stackLimit)
 {
-    for (size_t dp = 0; (dp < MDS_CORE_BACKTRACE_DEPTH) && (stackPoint < stackLimit);
+    for (size_t dp = 0; (dp < CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (stackPoint < stackLimit);
          stackPoint += sizeof(uintptr_t)) {
         uintptr_t pc = *((uintptr_t *)stackPoint) - sizeof(uintptr_t);
         if (!MDS_CoreStackPointerInCode(pc)) {
@@ -556,7 +557,7 @@ static void CORE_ExceptionBacktrace(uintptr_t mcause, uintptr_t mscratch, uintpt
     UNUSED(mscratch);
     UNUSED(sp);
 
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH != 0))
+#if (defined(CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (CONFIG_MDS_CORE_BACKTRACE_DEPTH != 0))
     MDS_LOG_F("mcause:%d mscratch:0x%x sp:0x%x backtrace", mcause, mscratch, sp);
     CORE_StackBacktrace((mscratch != 0) ? (mscratch) : (sp), (uintptr_t)__StackTop);
 
@@ -655,7 +656,8 @@ __attribute__((naked, __aligned__(0x04))) void Trap_Handler(void)
         __asm volatile("csrrw       sp, mscratch, sp");
     }
 
-#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
+#if (defined(CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&                                            \
+     (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
     if (g_coreScheduler.swflag) {
         g_coreScheduler.swflag = false;
 

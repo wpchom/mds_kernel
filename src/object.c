@@ -20,7 +20,7 @@
 /* Variable ---------------------------------------------------------------- */
 static MDS_ListNode_t g_objectList[] = {
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_DEVICE),
-#ifndef MDS_KERNEL_REDIRECT
+#ifndef CONFIG_MDS_KERNEL_REDIRECT
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_TIMER),      //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_THREAD),     //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_SEMAPHORE),  //
@@ -44,7 +44,7 @@ MDS_Err_t MDS_ObjectInit(MDS_Object_t *object, MDS_ObjectType_t type, const char
 
     MDS_ListInitNode(&(object->node));
     object->flags = type;
-    (void)MDS_Strlcpy(object->name, name, MDS_OBJECT_NAME_SIZE);
+    (void)MDS_Strlcpy(object->name, name, sizeof(object->name));
 
     MDS_Item_t lock = MDS_CoreInterruptLock();
     MDS_ListInsertNodePrev(&(g_objectList[type]), &(object->node));
@@ -120,7 +120,7 @@ size_t MDS_ObjectGetCount(MDS_ObjectType_t type)
 {
     MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
 
-    return (MDS_ListGetLength(&(g_objectList[type])));
+    return (MDS_ListGetCount(&(g_objectList[type])));
 }
 
 const char *MDS_ObjectGetName(const MDS_Object_t *object)

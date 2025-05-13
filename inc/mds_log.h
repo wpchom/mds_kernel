@@ -50,11 +50,11 @@ extern "C" {
 #define MDS_LOG_LEVEL_DBG 5
 
 typedef struct MDS_LOG_Module MDS_LOG_Module_t;
-typedef void (*MDS_LOG_ModuleVaPrint_t)(const MDS_LOG_Module_t *module, uint8_t level,
-                                        size_t va_size, const char *fmt, va_list va_args);
+typedef void (*MDS_LOG_VaPrint_t)(const MDS_LOG_Module_t *module, uint8_t level, size_t va_size,
+                                  const char *fmt, va_list va_args);
 
 typedef struct MDS_LOG_Filter {
-    MDS_LOG_ModuleVaPrint_t backend;
+    MDS_LOG_VaPrint_t backend;
     uint8_t level;  // align ?
 } MDS_LOG_Filter_t;
 
@@ -76,10 +76,6 @@ struct MDS_LOG_Module {
 
 #define __LOG_MODULE_LEVEL(...) MDS_ARGUMENT_GET_N(1, ##__VA_ARGS__, CONFIG_MDS_LOG_BUILD_LEVEL)
 
-#define __LOG_MODULE_NAME(_name, ...)                                                             \
-    MDS_ARGUMENT_CAT(G_MDS_LOG_MODULE_##_name,                                                    \
-                     MDS_ARGUMENT_CAT(_, __LOG_MODULE_LEVEL(__VA_ARGS__)))
-
 #define MDS_LOG_MODULE_DECLARE(_name, ...)                                                        \
     static __attribute__((used))                                                                  \
     const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
@@ -88,7 +84,7 @@ struct MDS_LOG_Module {
     const MDS_LOG_Module_t *const __THIS_LOG_MODULE_HANDLE = &(G_MDS_LOG_MODULE_##_name)
 
 #if (defined(CONFIG_MDS_LOG_FILTER_ENABLE) && (CONFIG_MDS_LOG_FILTER_ENABLE != 0))
-#define MDS_LOG_MODULE_REGISTER(_name, ...)                                                       \
+#define MDS_LOG_MODULE_INIT(_name, ...)                                                           \
     static __attribute__((used))                                                                  \
     const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
     static MDS_LOG_Filter_t g_mds_log_filter_##_name = {                                          \
@@ -103,7 +99,7 @@ struct MDS_LOG_Module {
 #define MDS_LOG_MODULE_LEVEL(_lvl)       __THIS_LOG_MODULE_HANDLE->filter->level = _lvl
 #define MDS_LOG_MODULE_BACKEND(_backend) __THIS_LOG_MODULE_HANDLE->filter->backend = _backend
 #else
-#define MDS_LOG_MODULE_REGISTER(_name, ...)                                                       \
+#define MDS_LOG_MODULE_INIT(_name, ...)                                                           \
     static __attribute__((used))                                                                  \
     const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
     const MDS_LOG_Module_t G_MDS_LOG_MODULE_##_name = {.name = #_name};                           \
@@ -161,7 +157,7 @@ struct MDS_LOG_Module {
 #define MDS_LOG_D(_fmt, ...) MDS_LOG_PRINT(MDS_LOG_LEVEL_DBG, _fmt, ##__VA_ARGS__)
 
 /* Function ---------------------------------------------------------------- */
-void MDS_LOG_RegisterVaPrint(MDS_LOG_ModuleVaPrint_t logVaPrint);
+void MDS_LOG_RegisterVaPrint(MDS_LOG_VaPrint_t logVaPrint);
 
 __attribute__((format(printf, 4, 5))) void MDS_LOG_ModulePrintf(const MDS_LOG_Module_t *module,
                                                                 uint8_t level, size_t va_size,
@@ -183,7 +179,7 @@ __attribute__((noreturn, format(printf, 2, 3))) void MDS_PanicPrintf(size_t va_s
 #else
 #define MDS_PANIC(_fmt, ...)                                                                      \
     do {                                                                                          \
-        MDS_PanicPrintf(0, "");                                                                   \
+        MDS_PanicPrintf(0, NULL);                                                                 \
     } while (0)
 #endif
 
@@ -199,16 +195,22 @@ __attribute__((noreturn, format(printf, 2, 3))) void MDS_PanicPrintf(size_t va_s
 #define MDS_ASSERT(condition) (void)(condition)
 #endif
 
-/* Trace ------------------------------------------------------------------- */
-typedef struct MDS_LOG_TraceNode {
-    const void *dump;
-    uint8_t enabled;
-} MDS_LOG_TraceNode_t;
+/* Hook -------------------------------------------------------------------- */
+#define MDS_HOOK_DECLARE(_MODULE, _TYPE)                                                          \
+    MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE, (extern const _TYPE G_MDS_HOOK_##_MODULE),  \
+                    ())
 
-#define MDS_TRACE_REGISTER(_name, _enable)                                                        \
-    const MDS_LOG_TraceNode_t G_MDS_TRACE_NODE_##_name = {.enabled = _enable}
+#define MDS_HOOK_INIT(_MODULE, _TYPE, ...)                                                        \
+    MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE,                                             \
+                    (const _TYPE G_MDS_HOOK_##_MODULE = {__DEBRACKET __VA_ARGS__}), ())
 
-#define MDS_TRACE_DECLARE(_name) extern const MDS_LOG_TraceNode_t G_MDS_TRACE_NODE_##_nam
+#define MDS_HOOK_CALL(_MODULE, _func, ...)                                                        \
+    MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE, (do {                                       \
+                        if ((G_MDS_HOOK_##_MODULE._func) != NULL) {                               \
+                            G_MDS_HOOK_##_MODULE._func(__DEBRACKET __VA_ARGS__);                  \
+                        }                                                                         \
+                    } while (0)),                                                                 \
+                    ())
 
 /* Compress ---------------------------------------------------------------- */
 typedef struct MDS_LOG_Compress {

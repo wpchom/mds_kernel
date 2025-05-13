@@ -12,34 +12,28 @@
 /* Include ----------------------------------------------------------------- */
 #include "kernel.h"
 
-/* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(TIMER_ENTER, MDS_Timer_t *timer);
-MDS_HOOK_INIT(TIMER_EXIT, MDS_Timer_t *timer);
-MDS_HOOK_INIT(TIMER_START, MDS_Timer_t *timer);
-MDS_HOOK_INIT(TIMER_STOP, MDS_Timer_t *timer);
-
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
-#ifndef MDS_TIMER_THREAD_PRIORITY
-#define MDS_TIMER_THREAD_PRIORITY 0
+#ifndef CONFIG_MDS_TIMER_THREAD_PRIORITY
+#define CONFIG_MDS_TIMER_THREAD_PRIORITY 0
 #endif
 
-#ifndef MDS_TIMER_THREAD_STACKSIZE
-#define MDS_TIMER_THREAD_STACKSIZE 256
+#ifndef CONFIG_MDS_TIMER_THREAD_STACKSIZE
+#define CONFIG_MDS_TIMER_THREAD_STACKSIZE 256
 #endif
 
-#ifndef MDS_TIMER_THREAD_TICKS
-#define MDS_TIMER_THREAD_TICKS 16
+#ifndef CONFIG_MDS_TIMER_THREAD_TICKS
+#define CONFIG_MDS_TIMER_THREAD_TICKS 16
 #endif
 
 /* Variable ---------------------------------------------------------------- */
-static MDS_ListNode_t g_sysTimerSkipList[MDS_TIMER_SKIPLIST_LEVEL];
+static MDS_ListNode_t g_sysTimerSkipList[CONFIG_MDS_TIMER_SKIPLIST_LEVEL];
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
+#if (defined(CONFIG_MDS_TIMER_THREAD_ENABLE) && (CONFIG_MDS_TIMER_THREAD_ENABLE != 0))
 static struct MDS_threadTimer {
-    MDS_ListNode_t skipList[MDS_TIMER_SKIPLIST_LEVEL];
-    uint8_t stack[MDS_TIMER_THREAD_STACKSIZE];
+    MDS_ListNode_t skipList[CONFIG_MDS_TIMER_SKIPLIST_LEVEL];
+    uint8_t stack[CONFIG_MDS_TIMER_THREAD_STACKSIZE];
     MDS_Thread_t thread;
     bool isBusy;
 } g_threadTimer;
@@ -78,9 +72,9 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size, bool isSoft)
         }
         MDS_ListInsertNodeNext(&runList, &(t->node[size - 1]));
 
-        MDS_HOOK_CALL(TIMER_ENTER, t);
+        MDS_HOOK_CALL(KERNEL, timer, (t, MDS_KERNEL_TRACE_TIMER_ENTER));
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
+#if (defined(CONFIG_MDS_TIMER_THREAD_ENABLE) && (CONFIG_MDS_TIMER_THREAD_ENABLE != 0))
         if (t->entry != NULL) {
             if (isSoft) {
                 g_threadTimer.isBusy = true;
@@ -99,7 +93,7 @@ static void TIMER_Check(MDS_ListNode_t timerList[], size_t size, bool isSoft)
         }
 #endif
 
-        MDS_HOOK_CALL(TIMER_EXIT, t);
+        MDS_HOOK_CALL(KERNEL, timer, (t, MDS_KERNEL_TRACE_TIMER_EXIT));
 
         MDS_LOG_D("[timer]timer(%p) entry:%p flag:%x exit current tick:%lu", t, t->entry, t->flags,
                   currTick);
@@ -132,7 +126,7 @@ static MDS_Timer_t *TIMER_NextTickoutTimer(MDS_ListNode_t timerList[], size_t si
     return (timer);
 }
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
+#if (defined(CONFIG_MDS_TIMER_THREAD_ENABLE) && (CONFIG_MDS_TIMER_THREAD_ENABLE != 0))
 static __attribute__((noreturn)) void TIMER_ThreadEntry(MDS_Arg_t *arg)
 {
     UNUSED(arg);
@@ -221,7 +215,7 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
     }
 
     static size_t skipRand = 0;
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
+#if (defined(CONFIG_MDS_TIMER_THREAD_ENABLE) && (CONFIG_MDS_TIMER_THREAD_ENABLE != 0))
     MDS_ListNode_t *timerList = ((timer->flags & MDS_TIMER_TYPE_SYSTEM) == 0U)
                                     ? (g_threadTimer.skipList)
                                     : (g_sysTimerSkipList);
@@ -236,12 +230,12 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
         timer->flags &= ~MDS_TIMER_FLAG_ACTIVED;
 
         if (timeout.ticks == MDS_CLOCK_TICK_NO_WAIT) {
-            MDS_HOOK_CALL(TIMER_STOP, timer);
+            MDS_HOOK_CALL(KERNEL, timer, (timer, MDS_KERNEL_TRACE_TIMER_STOP));
         } else {
             timer->tickstart = MDS_ClockGetTickCount();
             timer->ticklimit = timer->tickstart + timeout.ticks;
 
-            MDS_HOOK_CALL(TIMER_START, timer);
+            MDS_HOOK_CALL(KERNEL, timer, (timer, MDS_KERNEL_TRACE_TIMER_START));
 
             MDS_ListNode_t *skipNode[ARRAY_SIZE(timer->node)];
             MDS_SkipListSearchNode(skipNode, timerList, ARRAY_SIZE(timer->node),
@@ -249,10 +243,10 @@ MDS_Err_t MDS_TimerStart(MDS_Timer_t *timer, MDS_Timeout_t timeout)
 
             skipRand = skipRand + timer->tickstart + 1;
             MDS_SkipListInsertNode(skipNode, timer->node, ARRAY_SIZE(timer->node), skipRand,
-                                   MDS_TIMER_SKIPLIST_SHIFT);
+                                   CONFIG_MDS_TIMER_SKIPLIST_SHIFT);
             timer->flags |= MDS_TIMER_FLAG_ACTIVED;
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
+#if (defined(CONFIG_MDS_TIMER_THREAD_ENABLE) && (CONFIG_MDS_TIMER_THREAD_ENABLE != 0))
             if (((timer->flags & MDS_TIMER_TYPE_SYSTEM) == 0U) &&
                 ((!(g_threadTimer.isBusy)) &&
                  ((g_threadTimer.thread.state & MDS_THREAD_STATE_MASK) ==
@@ -282,7 +276,7 @@ MDS_Err_t MDS_TimerStop(MDS_Timer_t *timer)
     if ((timer->flags & MDS_TIMER_FLAG_ACTIVED) != 0U) {
         MDS_Item_t lock = MDS_CoreInterruptLock();
 
-        MDS_HOOK_CALL(TIMER_STOP, timer);
+        MDS_HOOK_CALL(KERNEL, timer, (timer, MDS_KERNEL_TRACE_TIMER_STOP));
 
         MDS_SkipListRemoveNode(timer->node, ARRAY_SIZE(timer->node));
         timer->flags &= ~MDS_TIMER_FLAG_ACTIVED;
@@ -311,12 +305,13 @@ void MDS_SysTimerInit(void)
 {
     MDS_SkipListInitNode(g_sysTimerSkipList, ARRAY_SIZE(g_sysTimerSkipList));
 
-#if (defined(MDS_TIMER_THREAD_ENABLE) && (MDS_TIMER_THREAD_ENABLE != 0))
+#if (defined(CONFIG_MDS_TIMER_THREAD_ENABLE) && (CONFIG_MDS_TIMER_THREAD_ENABLE != 0))
     MDS_SkipListInitNode(g_threadTimer.skipList, ARRAY_SIZE(g_threadTimer.skipList));
 
     MDS_Err_t err = MDS_ThreadInit(&(g_threadTimer.thread), "timer", TIMER_ThreadEntry, NULL,
                                    &(g_threadTimer.stack), sizeof(g_threadTimer.stack),
-                                   MDS_TIMER_THREAD_PRIORITY, MDS_TIMER_THREAD_TICKS);
+                                   CONFIG_MDS_TIMER_THREAD_PRIORITY,
+                                   CONFIG_MDS_TIMER_THREAD_TICKS);
     if (err == MDS_EOK) {
         MDS_ThreadStartup(&(g_threadTimer.thread));
     } else {

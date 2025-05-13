@@ -225,14 +225,15 @@ bool MDS_CoreThreadStackCheck(MDS_Thread_t *thread)
         return (false);
     }
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
 #endif
 
     return (true);
 }
 
 /* CoreScheduler ----------------------------------------------------------- */
-#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
+#if (defined(CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&                                            \
+     (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
 static struct CoreScheduler {
     uintptr_t swflag;
     uintptr_t *fromSP;
@@ -351,7 +352,7 @@ __attribute__((naked)) void PendSV_Handler(void)
 #endif
 
 /* Backtrace --------------------------------------------------------------- */
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH != 0))
+#if (defined(CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (CONFIG_MDS_CORE_BACKTRACE_DEPTH != 0))
 __attribute__((weak)) bool MDS_CoreStackPointerInCode(uintptr_t pc)
 {
 #if defined(__IAR_SYSTEMS_ICC__)
@@ -408,11 +409,11 @@ __attribute__((weak)) void MDS_CoreExceptionCallback(bool exit)
 
 static void CORE_ExceptionBacktrace(void)
 {
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH != 0))
+#if (defined(CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (CONFIG_MDS_CORE_BACKTRACE_DEPTH != 0))
     uintptr_t msp = CORE_GetMSP();
     const uintptr_t **SCB_VTOR_STACK = (const uintptr_t **)0xE000ED08;
     MDS_LOG_F("msp:%p stacklimit:%p backtrace", (void *)msp, (void *)**SCB_VTOR_STACK);
-    CORE_StackBacktrace(msp, **SCB_VTOR_STACK, MDS_CORE_BACKTRACE_DEPTH);
+    CORE_StackBacktrace(msp, **SCB_VTOR_STACK, CONFIG_MDS_CORE_BACKTRACE_DEPTH);
 
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
     if (thread != NULL) {
@@ -420,7 +421,7 @@ static void CORE_ExceptionBacktrace(void)
         MDS_LOG_F("current thread(%p) entry:%p psp:%p stackbase:%p stacksize:%u backtrace", thread,
                   thread->entry, (void *)psp, thread->stackBase, thread->stackSize);
         CORE_StackBacktrace(psp, (uintptr_t)(thread->stackBase) + thread->stackSize,
-                            MDS_CORE_BACKTRACE_DEPTH);
+                            CONFIG_MDS_CORE_BACKTRACE_DEPTH);
     }
 #endif
 }

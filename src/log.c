@@ -13,19 +13,19 @@
 #include "mds_sys.h"
 
 /* Define ------------------------------------------------------------------ */
-MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_LOG_BUILD_LEVEL);
+MDS_LOG_MODULE_INIT(kernel, CONFIG_MDS_LOG_BUILD_LEVEL);
 
 /* Variable ---------------------------------------------------------------- */
-static MDS_LOG_ModuleVaPrint_t g_logVaPrintFunc = NULL;
+static MDS_LOG_VaPrint_t g_logVaPrintFunc = NULL;
 
 /* Function ---------------------------------------------------------------- */
-void MDS_LOG_RegisterVaPrint(MDS_LOG_ModuleVaPrint_t logVaPrint)
+void MDS_LOG_RegisterVaPrint(MDS_LOG_VaPrint_t logVaPrint)
 {
     g_logVaPrintFunc = logVaPrint;
 }
 
-static void MDS_LOG_ModuleVaPrintf(const MDS_LOG_Module_t *module, uint8_t level, size_t va_size,
-                                   const char *fmt, va_list va_args)
+static void MDS_LOG_ModuleVaPrintf(const MDS_LOG_Module_t *module, uint8_t level,
+                                   size_t va_size, const char *fmt, va_list va_args)
 {
 #if (defined(CONFIG_MDS_LOG_FILTER_ENABLE) && (CONFIG_MDS_LOG_FILTER_ENABLE != 0))
     if ((module != NULL) && (module->filter != NULL)) {
@@ -63,7 +63,8 @@ __attribute__((noreturn)) void MDS_PanicPrintf(size_t va_size, const char *fmt, 
     va_list va_args;
 
     va_start(va_args, fmt);
-    MDS_LOG_ModuleVaPrintf(__THIS_LOG_MODULE_HANDLE, MDS_LOG_LEVEL_FAT, va_size, fmt, va_args);
+    MDS_LOG_ModuleVaPrintf(__THIS_LOG_MODULE_HANDLE, MDS_LOG_LEVEL_FAT, va_size, fmt,
+                           va_args);
     va_end(va_args);
 #else
     UNUSED(va_size);
@@ -92,8 +93,8 @@ __attribute__((noreturn)) void MDS_PanicPrintf(size_t va_size, const char *fmt, 
 #define MDS_LOG_COMPRESS_ARG_FIX(x) ((x == 0xFFFFFFFF) ? (0xBDC5CA39) : (x))
 #endif
 
-size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, size_t cnt, const char *fmt,
-                                va_list ap)
+size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, size_t cnt,
+                                const char *fmt, va_list ap)
 {
     static size_t logCompressPsn = 0;
 
@@ -121,7 +122,8 @@ size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, size_t cn
         log->args[idx] = MDS_LOG_COMPRESS_ARG_FIX(val);
     }
 
-    return (sizeof(MDS_LOG_Compress_t) - (sizeof(uint32_t) * (MDS_LOG_COMPRESS_ARGS_NUMS + cnt)));
+    return (sizeof(MDS_LOG_Compress_t) -
+            (sizeof(uint32_t) * (MDS_LOG_COMPRESS_ARGS_NUMS + cnt)));
 }
 
 size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, size_t cnt,

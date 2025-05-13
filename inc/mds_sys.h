@@ -26,8 +26,8 @@ extern "C" {
 #endif
 
 /* Init -------------------------------------------------------------------- */
-#ifndef MDS_INIT_SECTION
-#define MDS_INIT_SECTION ".init.mdsInit."
+#ifndef CONFIG_MDS_INIT_SECTION
+#define CONFIG_MDS_INIT_SECTION ".init.mdsInit."
 #endif
 
 #define MDS_INIT_PRIORITY_0 "0."
@@ -44,13 +44,13 @@ extern "C" {
 typedef void (*MDS_InitFunc_t)(void);
 
 #define MDS_INIT_IMPORT(priority, func)                                                           \
-    static __attribute__((used, section(MDS_INIT_SECTION priority #func)))                        \
+    static __attribute__((used, section(CONFIG_MDS_INIT_SECTION priority #func)))                 \
     const MDS_InitFunc_t __MDS_INIT_##func = (func)
 
 static inline void MDS_InitExport(void)
 {
-    static __attribute__((section(MDS_INIT_SECTION "\000"))) const void *initBegin = NULL;
-    static __attribute__((section(MDS_INIT_SECTION "\177"))) const void *initLimit = NULL;
+    static __attribute__((section(CONFIG_MDS_INIT_SECTION "\000"))) const void *initBegin = NULL;
+    static __attribute__((section(CONFIG_MDS_INIT_SECTION "\177"))) const void *initLimit = NULL;
 
     for (const MDS_InitFunc_t *init = (MDS_InitFunc_t *)((uintptr_t)(&initBegin) + sizeof(void *));
          init < (MDS_InitFunc_t *)(&initLimit); init++) {
@@ -61,8 +61,8 @@ static inline void MDS_InitExport(void)
 }
 
 /* Core -------------------------------------------------------------------- */
-#ifndef MDS_CORE_BACKTRACE_DEPTH
-#define MDS_CORE_BACKTRACE_DEPTH 16
+#ifndef CONFIG_MDS_CORE_BACKTRACE_DEPTH
+#define CONFIG_MDS_CORE_BACKTRACE_DEPTH 16
 #endif
 
 void MDS_CoreIdleSleep(void);
@@ -71,24 +71,24 @@ MDS_Item_t MDS_CoreInterruptLock(void);
 void MDS_CoreInterruptRestore(MDS_Item_t lock);
 
 /* Clock ------------------------------------------------------------------- */
-#ifndef MDS_CLOCK_TICK_FREQ_HZ
-#define MDS_CLOCK_TICK_FREQ_HZ 1000U
+#ifndef CONFIG_MDS_CLOCK_TICK_FREQ_HZ
+#define CONFIG_MDS_CLOCK_TICK_FREQ_HZ 1000U
 #endif
 
-#ifndef MDS_CLOCK_TIMEZONE_DEFAULT
-#define MDS_CLOCK_TIMEZONE_DEFAULT (+8)
+#ifndef CONFIG_MDS_CLOCK_TIMEZONE_DEFAULT
+#define CONFIG_MDS_CLOCK_TIMEZONE_DEFAULT (+8)
 #endif
 
-#ifndef MDS_CLOCK_TIMESTAMP_DEFAULT
-#define MDS_CLOCK_TIMESTAMP_DEFAULT 1577836800000LL
+#ifndef CONFIG_MDS_CLOCK_TIMESTAMP_DEFAULT
+#define CONFIG_MDS_CLOCK_TIMESTAMP_DEFAULT 1577836800000LL
 #endif
 
 #define MDS_CLOCK_TICK_NO_WAIT   ((MDS_Tick_t)(0))
 #define MDS_CLOCK_TICK_FOREVER   ((MDS_Tick_t)(-1))
 #define MDS_CLOCK_TICK_TIMER_MAX ((MDS_Tick_t)(MDS_CLOCK_TICK_FOREVER / 2))
 
-#define MDS_CLOCK_TICK_TO_MS(t) ((t) * MDS_TIME_MSEC_OF_SEC / MDS_CLOCK_TICK_FREQ_HZ)
-#define MDS_CLOCK_TICK_TO_US(t) ((t) * MDS_TIME_USEC_OF_SEC / MDS_CLOCK_TICK_FREQ_HZ)
+#define MDS_CLOCK_TICK_TO_MS(t) ((t) * MDS_TIME_MSEC_OF_SEC / CONFIG_MDS_CLOCK_TICK_FREQ_HZ)
+#define MDS_CLOCK_TICK_TO_US(t) ((t) * MDS_TIME_USEC_OF_SEC / CONFIG_MDS_CLOCK_TICK_FREQ_HZ)
 
 MDS_Tick_t MDS_ClockGetTickCount(void);
 void MDS_ClockSetTickCount(MDS_Tick_t tickcnt);
@@ -118,13 +118,13 @@ typedef struct MDS_Timeout {
 #define MDS_TIMEOUT_NO_WAIT  MDS_TIMEOUT_TICKS(MDS_CLOCK_TICK_NO_WAIT)
 #define MDS_TIMEOUT_FOREVER  MDS_TIMEOUT_TICKS(MDS_CLOCK_TICK_FOREVER)
 
-#define MDS_TIMEOUT_MS(t) MDS_TIMEOUT_TICKS(((t) * MDS_CLOCK_TICK_FREQ_HZ / MDS_TIME_MSEC_OF_SEC))
-#define MDS_TIMEOUT_US(t) MDS_TIMEOUT_TICKS(((t) * MDS_CLOCK_TICK_FREQ_HZ / MDS_TIME_USEC_OF_SEC))
+#define MDS_TIMEOUT_MS(t)                                                                         \
+    MDS_TIMEOUT_TICKS(((t) * CONFIG_MDS_CLOCK_TICK_FREQ_HZ / MDS_TIME_MSEC_OF_SEC))
+#define MDS_TIMEOUT_US(t)                                                                         \
+    MDS_TIMEOUT_TICKS(((t) * CONFIG_MDS_CLOCK_TICK_FREQ_HZ / MDS_TIME_USEC_OF_SEC))
 
 /* SysMem ------------------------------------------------------------------ */
-#ifndef MDS_SYSMEM_ALIGN_SIZE
 #define MDS_SYSMEM_ALIGN_SIZE sizeof(uintptr_t)
-#endif
 
 void *MDS_SysMemAlloc(size_t size);
 void *MDS_SysMemCalloc(size_t nmemb, size_t size);
@@ -132,14 +132,14 @@ void *MDS_SysMemRealloc(void *ptr, size_t size);
 void MDS_SysMemFree(void *ptr);
 
 /* Object ------------------------------------------------------------------ */
-#ifndef MDS_OBJECT_NAME_SIZE
-#define MDS_OBJECT_NAME_SIZE 7
+#ifndef CONFIG_MDS_OBJECT_NAME_SIZE
+#define CONFIG_MDS_OBJECT_NAME_SIZE 7
 #endif
 
 typedef struct MDS_Object {
     MDS_ListNode_t node;
     uint8_t flags;
-    char name[MDS_OBJECT_NAME_SIZE];
+    char name[CONFIG_MDS_OBJECT_NAME_SIZE];
 } MDS_Object_t;
 
 typedef enum MDS_ObjectType {
@@ -155,7 +155,7 @@ typedef enum MDS_ObjectType {
     MDS_OBJECT_TYPE_MEMHEAP,
 } MDS_ObjectType_t;
 
-#ifndef MDS_KERNEL_REDIRECT
+#ifndef CONFIG_MDS_KERNEL_REDIRECT
 typedef struct MDS_Timer MDS_Timer_t;
 typedef struct MDS_Thread MDS_Thread_t;
 typedef struct MDS_Semaphore MDS_Semaphore_t;
@@ -188,16 +188,16 @@ MDS_Tick_t MDS_KernelGetSleepTick(void);
 void MDS_KernelCompensateTick(MDS_Tick_t ticks);
 
 /* Timer ------------------------------------------------------------------- */
-#ifndef MDS_TIMER_SKIPLIST_LEVEL
-#define MDS_TIMER_SKIPLIST_LEVEL 1
+#ifndef CONFIG_MDS_TIMER_SKIPLIST_LEVEL
+#define CONFIG_MDS_TIMER_SKIPLIST_LEVEL 1
 #endif
 
-#ifndef MDS_TIMER_SKIPLIST_SHIFT
-#define MDS_TIMER_SKIPLIST_SHIFT 2
+#ifndef CONFIG_MDS_TIMER_THREAD_ENABLE
+#define CONFIG_MDS_TIMER_THREAD_ENABLE 1
 #endif
 
-#ifndef MDS_TIMER_THREAD_ENABLE
-#define MDS_TIMER_THREAD_ENABLE 1
+#ifndef CONFIG_MDS_TIMER_SKIPLIST_SHIFT
+#define CONFIG_MDS_TIMER_SKIPLIST_SHIFT 2
 #endif
 
 typedef void (*MDS_TimerEntry_t)(MDS_Arg_t *arg);
@@ -213,7 +213,7 @@ enum MDS_TimerType {
 struct MDS_Timer {
     MDS_Object_t object;
 
-    MDS_ListNode_t node[MDS_TIMER_SKIPLIST_LEVEL];
+    MDS_ListNode_t node[CONFIG_MDS_TIMER_SKIPLIST_LEVEL];
     MDS_TimerEntry_t entry;
     MDS_Arg_t *arg;
     MDS_Mask_t flags;
@@ -232,8 +232,8 @@ MDS_Err_t MDS_TimerStop(MDS_Timer_t *timer);
 bool MDS_TimerIsActived(const MDS_Timer_t *timer);
 
 /* Thread ------------------------------------------------------------------ */
-#ifndef MDS_KERNEL_THREAD_PRIORITY_MAX
-#define MDS_KERNEL_THREAD_PRIORITY_MAX 32
+#ifndef CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX
+#define CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX 32
 #endif
 
 typedef void (*MDS_ThreadEntry_t)(MDS_Arg_t *arg);
@@ -273,7 +273,7 @@ struct MDS_Thread {
     uint8_t eventOpt;
     MDS_Mask_t eventMask;
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
     void *stackWater;
 #endif
 };
@@ -449,7 +449,7 @@ typedef struct MDS_MemHeap {
     MDS_Semaphore_t lock;
     const MDS_MemHeapOps_t *ops;
     void *begin, *limit;
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE != 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
     MDS_MemHeapSize_t size;
 #endif
 } MDS_MemHeap_t;
@@ -467,75 +467,71 @@ extern const MDS_MemHeapOps_t G_MDS_MEMHEAP_OPS_LLFF;
 extern const MDS_MemHeapOps_t G_MDS_MEMHEAP_OPS_TLSF;
 
 /* Hook -------------------------------------------------------------------- */
-#if (defined(MDS_KERNEL_HOOK_ENABLE) && (MDS_KERNEL_HOOK_ENABLE != 0))
-void MDS_HOOK_SCHEDULER_SWITCH_Register(void (*hook)(MDS_Thread_t *toThread,
-                                                     MDS_Thread_t *fromThread));
-
-void MDS_HOOK_TIMER_ENTER_Register(void (*hook)(MDS_Timer_t *timer));
-void MDS_HOOK_TIMER_EXIT_Register(void (*hook)(MDS_Timer_t *timer));
-void MDS_HOOK_TIMER_START_Register(void (*hook)(MDS_Timer_t *timer));
-void MDS_HOOK_TIMER_STOP_Register(void (*hook)(MDS_Timer_t *timer));
-
-void MDS_HOOK_THREAD_INIT_Register(void (*hook)(MDS_Thread_t *thread));
-void MDS_HOOK_THREAD_EXIT_Register(void (*hook)(MDS_Thread_t *thread));
-void MDS_HOOK_THREAD_RESUME_Register(void (*hook)(MDS_Thread_t *thread));
-void MDS_HOOK_THREAD_SUSPEND_Register(void (*hook)(MDS_Thread_t *thread));
-
-void MDS_HOOK_SEMAPHORE_TRY_ACQUIRE_Register(void (*hook)(MDS_Semaphore_t *semaphore,
-                                                          MDS_Timeout_t timeout));
-void MDS_HOOK_SEMAPHORE_HAS_ACQUIRE_Register(void (*hook)(MDS_Semaphore_t *semaphore,
-                                                          MDS_Err_t err));
-void MDS_HOOK_SEMAPHORE_HAS_RELEASE_Register(void (*hook)(MDS_Semaphore_t *semaphore));
-
-void MDS_HOOK_MUTEX_TRY_ACQUIRE_Register(void (*hook)(MDS_Mutex_t *mutex, MDS_Timeout_t timeout));
-void MDS_HOOK_MUTEX_HAS_ACQUIRE_Register(void (*hook)(MDS_Mutex_t *mutex, MDS_Err_t err));
-void MDS_HOOK_MUTEX_HAS_RELEASE_Register(void (*hook)(MDS_Mutex_t *mutex));
-
-void MDS_HOOK_EVENT_TRY_ACQUIRE_Register(void (*hook)(MDS_Event_t *event, MDS_Timeout_t timeout));
-void MDS_HOOK_EVENT_HAS_ACQUIRE_Register(void (*hook)(MDS_Event_t *event, MDS_Err_t err));
-void MDS_HOOK_EVENT_HAS_SET_Register(void (*hook)(MDS_Event_t *event, MDS_Mask_t mask));
-void MDS_HOOK_EVENT_HAS_CLR_Register(void (*hook)(MDS_Event_t *event, MDS_Mask_t mask));
-
-void MDS_HOOK_MSGQUEUE_TRY_RECV_Register(void (*hook)(MDS_MsgQueue_t *msgQueue,
-                                                      MDS_Timeout_t timeout));
-void MDS_HOOK_MSGQUEUE_HAS_RECV_Register(void (*hook)(MDS_MsgQueue_t *msgQueue, MDS_Err_t err));
-void MDS_HOOK_MSGQUEUE_TRY_SEND_Register(void (*hook)(MDS_MsgQueue_t *msgQueue,
-                                                      MDS_Timeout_t timeout));
-void MDS_HOOK_MSGQUEUE_HAS_SEND_Register(void (*hook)(MDS_MsgQueue_t *msgQueue, MDS_Err_t err));
-
-void MDS_HOOK_MEMPOOL_TRY_ALLOC_Register(void (*hook)(MDS_MemPool_t *memPool,
-                                                      MDS_Timeout_t timeout));
-void MDS_HOOK_MEMPOOL_HAS_ALLOC_Register(void (*hook)(MDS_MemPool_t *memPool, void *ptr));
-void MDS_HOOK_MEMPOOL_HAS_FREE_Register(void (*hook)(MDS_MemPool_t *memPool, void *ptr));
-
-void MDS_HOOK_MEMHEAP_INIT_Register(void (*hook)(MDS_MemHeap_t *memheap, void *heapBegin,
-                                                 void *heapLimit, size_t metaSize));
-void MDS_HOOK_MEMHEAP_ALLOC_Register(void (*hook)(MDS_MemHeap_t *memheap, void *ptr, size_t size));
-void MDS_HOOK_MEMHEAP_FREE_Register(void (*hook)(MDS_MemHeap_t *memheap, void *ptr));
-void MDS_HOOK_MEMHEAP_REALLOC_Register(void (*hook)(MDS_MemHeap_t *memheap, void *old, void *new,
-                                                    size_t size));
-
-#define MDS_HOOK_INIT(type, ...)                                                                  \
-    static void (*g_hook_##type)(__VA_ARGS__) = NULL;                                             \
-    void MDS_HOOK_##type##_Register(void (*hook)(__VA_ARGS__))                                    \
-    {                                                                                             \
-        g_hook_##type = hook;                                                                     \
-    }
-
-#define MDS_HOOK_CALL(type, ...)                                                                  \
-    do {                                                                                          \
-        if (g_hook_##type != NULL) {                                                              \
-            g_hook_##type(__VA_ARGS__);                                                           \
-        }                                                                                         \
-    } while (0)
-
-#define MDS_HOOK_REGISTER(type, ...) MDS_HOOK_##type##_Register(__VA_ARGS__)
-
-#else
-#define MDS_HOOK_INIT(type, ...)
-#define MDS_HOOK_CALL(type, ...)
-#define MDS_HOOK_REGISTER(type, ...)
+#ifndef CONFIG_MDS_HOOK_ENABLE_KERNEL
+#define CONFIG_MDS_HOOK_ENABLE_KERNEL 0
 #endif
+
+typedef enum MDS_KERNEL_Trace {
+    MDS_KERNEL_TRACE_SCHEDULER_SWITCH,
+
+    MDS_KERNEL_TRACE_THREAD_INIT,
+    MDS_KERNEL_TRACE_THREAD_EXIT,
+    MDS_KERNEL_TRACE_THREAD_RESUME,
+    MDS_KERNEL_TRACE_THREAD_SUSPEND,
+
+    MDS_KERNEL_TRACE_TIMER_ENTER,
+    MDS_KERNEL_TRACE_TIMER_EXIT,
+    MDS_KERNEL_TRACE_TIMER_START,
+    MDS_KERNEL_TRACE_TIMER_STOP,
+
+    MDS_KERNEL_TRACE_MEMHEAP_INIT,
+    MDS_KERNEL_TRACE_MEMHEAP_ALLOC,
+    MDS_KERNEL_TRACE_MEMHEAP_FREE,
+    MDS_KERNEL_TRACE_MEMHEAP_REALLOC,
+
+    MDS_KERNEL_TRACE_SEMAPHORE_TRY_ACQUIRE,
+    MDS_KERNEL_TRACE_SEMAPHORE_HAS_ACQUIRE,
+    MDS_KERNEL_TRACE_SEMAPHORE_HAS_RELEASE,
+
+    MDS_KERNEL_TRACE_MUTEX_TRY_ACQUIRE,
+    MDS_KERNEL_TRACE_MUTEX_HAS_ACQUIRE,
+    MDS_KERNEL_TRACE_MUTEX_HAS_RELEASE,
+
+    MDS_KERNEL_TRACE_EVENT_TRY_ACQUIRE,
+    MDS_KERNEL_TRACE_EVENT_HAS_ACQUIRE,
+    MDS_KERNEL_TRACE_EVENT_HAS_SET,
+    MDS_KERNEL_TRACE_EVENT_HAS_CLR,
+
+    MDS_KERNEL_TRACE_MSGQUEUE_TRY_RECV,
+    MDS_KERNEL_TRACE_MSGQUEUE_HAS_RECV,
+    MDS_KERNEL_TRACE_MSGQUEUE_TRY_SEND,
+    MDS_KERNEL_TRACE_MSGQUEUE_HAS_SEND,
+
+    MDS_KERNEL_TRACE_MEMPOOL_TRY_ALLOC,
+    MDS_KERNEL_TRACE_MEMPOOL_HAS_ALLOC,
+    MDS_KERNEL_TRACE_MEMPOOL_HAS_FREE,
+
+} MDS_KERNEL_Trace_t;
+
+typedef struct MDS_HOOK_Kernel {
+    void (*scheduler)(const MDS_Thread_t *toThread, const MDS_Thread_t *fromThread);
+    void (*thread)(const MDS_Thread_t *thread, MDS_KERNEL_Trace_t id);
+    void (*timer)(const MDS_Timer_t *timer, MDS_KERNEL_Trace_t id);
+    void (*memheap)(const MDS_MemHeap_t *memheap, MDS_KERNEL_Trace_t id, void *free_begin,
+                    void *alloc_limit, size_t size);
+    void (*semaphore)(const MDS_Semaphore_t *semaphore, MDS_KERNEL_Trace_t id, MDS_Err_t err,
+                      MDS_Timeout_t timeout);
+    void (*mutex)(const MDS_Mutex_t *mutex, MDS_KERNEL_Trace_t id, MDS_Err_t err,
+                  MDS_Timeout_t timeout);
+    void (*event)(const MDS_Event_t *event, MDS_KERNEL_Trace_t id, MDS_Err_t err,
+                  MDS_Timeout_t timeout);
+    void (*msgqueue)(const MDS_MsgQueue_t *msgqueue, MDS_KERNEL_Trace_t id, MDS_Err_t err,
+                     MDS_Timeout_t timeout);
+    void (*mempool)(const MDS_MemPool_t *mempool, MDS_KERNEL_Trace_t id, MDS_Err_t err,
+                    MDS_Timeout_t timeout, void *blk);
+} MDS_HOOK_Kernel_t;
+
+MDS_HOOK_DECLARE(KERNEL, MDS_HOOK_Kernel_t);
 
 #ifdef __cplusplus
 }

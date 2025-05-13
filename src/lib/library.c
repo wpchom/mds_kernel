@@ -191,7 +191,7 @@ void *MDS_MemBuffSet(void *dst, int c, size_t size)
     uint8_t *ptr = dst;
     uint8_t *end = ptr + size;
 
-#if (defined(MDS_LIBRARY_MINIABLE) && (MDS_LIBRARY_MINIABLE != 0))
+#if (defined(CONFIG_MDS_LIBRARY_MINIABLE) && (CONFIG_MDS_LIBRARY_MINIABLE != 0))
     while (ptr < end) {
         *ptr++ = c;
     }
@@ -220,7 +220,7 @@ size_t MDS_MemBuffCopy(void *dst, size_t size, const void *src, size_t len)
     const uint8_t *s = src;
     const uint8_t *e = s + ((len < size) ? (len) : (size));
 
-#if (defined(MDS_LIBRARY_MINIABLE) && (MDS_LIBRARY_MINIABLE != 0))
+#if (defined(CONFIG_MDS_LIBRARY_MINIABLE) && (CONFIG_MDS_LIBRARY_MINIABLE != 0))
     while (s < e) {
         *d++ = *s++;
     }
@@ -740,7 +740,7 @@ static int FMT_VaParsePrint(char *buff, size_t size, size_t *pos, const char **f
     args.base = FMT_PrintIntegerBase(ch);
     if (args.base > 0) {
         FMT_PrintInteger(buff, size, pos, ch, ap, &args);
-#if (defined(MDS_FORMAT_WITH_FLOAT) && (MDS_FORMAT_WITH_FLOAT != 0))
+#if (defined(CONFIG_MDS_FORMAT_WITH_FLOAT) && (CONFIG_MDS_FORMAT_WITH_FLOAT != 0))
     } else if ((ch == 'f') || (ch == 'F') || (ch == 'e') || (ch == 'E') || (ch == 'g') ||
                (ch == 'G')) {
         FMT_PrintFloat(buff, size, pos, ch, ap, &args);

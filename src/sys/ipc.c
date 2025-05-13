@@ -13,26 +13,7 @@
 #include "kernel.h"
 
 /* Define ------------------------------------------------------------------ */
-MDS_LOG_MODULE_REGISTER(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
-
-/* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(SEMAPHORE_TRY_ACQUIRE, MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout);
-MDS_HOOK_INIT(SEMAPHORE_HAS_ACQUIRE, MDS_Semaphore_t *semaphore, MDS_Err_t err);
-MDS_HOOK_INIT(SEMAPHORE_HAS_RELEASE, MDS_Semaphore_t *semaphore);
-MDS_HOOK_INIT(MUTEX_TRY_ACQUIRE, MDS_Mutex_t *mutex, MDS_Timeout_t timeout);
-MDS_HOOK_INIT(MUTEX_HAS_ACQUIRE, MDS_Mutex_t *mutex, MDS_Err_t err);
-MDS_HOOK_INIT(MUTEX_HAS_RELEASE, MDS_Mutex_t *mutex);
-MDS_HOOK_INIT(EVENT_TRY_ACQUIRE, MDS_Event_t *event, MDS_Timeout_t timeout);
-MDS_HOOK_INIT(EVENT_HAS_ACQUIRE, MDS_Event_t *event, MDS_Err_t err);
-MDS_HOOK_INIT(EVENT_HAS_SET, MDS_Event_t *event, MDS_Mask_t mask);
-MDS_HOOK_INIT(EVENT_HAS_CLR, MDS_Event_t *event, MDS_Mask_t mask);
-MDS_HOOK_INIT(MSGQUEUE_TRY_RECV, MDS_MsgQueue_t *msgQueue, MDS_Timeout_t timeout);
-MDS_HOOK_INIT(MSGQUEUE_HAS_RECV, MDS_MsgQueue_t *msgQueue, MDS_Err_t err);
-MDS_HOOK_INIT(MSGQUEUE_TRY_SEND, MDS_MsgQueue_t *msgQueue, MDS_Timeout_t timeout);
-MDS_HOOK_INIT(MSGQUEUE_HAS_SEND, MDS_MsgQueue_t *msgQueue, MDS_Err_t err);
-MDS_HOOK_INIT(MEMPOOL_TRY_ALLOC, MDS_MemPool_t *memPool, MDS_Timeout_t timeout);
-MDS_HOOK_INIT(MEMPOOL_HAS_ALLOC, MDS_MemPool_t *memPool, void *ptr);
-MDS_HOOK_INIT(MEMPOOL_HAS_FREE, MDS_MemPool_t *memPool, void *ptr);
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 /* IPC thread -------------------------------------------------------------- */
 static void IPC_ListSuspendThread(MDS_ListNode_t *list, MDS_Thread_t *thread, bool isPrio,
@@ -65,8 +46,8 @@ static void IPC_ListSuspendThread(MDS_ListNode_t *list, MDS_Thread_t *thread, bo
     }
 }
 
-static MDS_Err_t IPC_ListSuspendWait(MDS_Item_t *lock, MDS_ListNode_t *list, MDS_Thread_t *thread,
-                                     MDS_Timeout_t timeout)
+static MDS_Err_t IPC_ListSuspendWait(MDS_Item_t *lock, MDS_ListNode_t *list,
+                                     MDS_Thread_t *thread, MDS_Timeout_t timeout)
 {
     MDS_Tick_t deltaTick = MDS_ClockGetTickCount();
 
@@ -112,7 +93,8 @@ static void IPC_ListResumeAllThread(MDS_ListNode_t *list)
 }
 
 /* Semaphore --------------------------------------------------------------- */
-MDS_Err_t MDS_SemaphoreInit(MDS_Semaphore_t *semaphore, const char *name, size_t init, size_t max)
+MDS_Err_t MDS_SemaphoreInit(MDS_Semaphore_t *semaphore, const char *name, size_t init,
+                            size_t max)
 {
     MDS_ASSERT(semaphore != NULL);
 
@@ -138,9 +120,8 @@ MDS_Err_t MDS_SemaphoreDeInit(MDS_Semaphore_t *semaphore)
 
 MDS_Semaphore_t *MDS_SemaphoreCreate(const char *name, size_t init, size_t max)
 {
-    MDS_Semaphore_t *semaphore = (MDS_Semaphore_t *)MDS_ObjectCreate(sizeof(MDS_Semaphore_t),
-                                                                     MDS_OBJECT_TYPE_SEMAPHORE,
-                                                                     name);
+    MDS_Semaphore_t *semaphore = (MDS_Semaphore_t *)MDS_ObjectCreate(
+        sizeof(MDS_Semaphore_t), MDS_OBJECT_TYPE_SEMAPHORE, name);
     if (semaphore != NULL) {
         semaphore->value = init;
         semaphore->max = max;
@@ -165,14 +146,15 @@ MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout
     MDS_ASSERT(semaphore != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(semaphore->object)) == MDS_OBJECT_TYPE_SEMAPHORE);
 
+    MDS_Err_t err = MDS_EOK;
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
 
-    MDS_HOOK_CALL(SEMAPHORE_TRY_ACQUIRE, semaphore, timeout);
+    MDS_HOOK_CALL(KERNEL, semaphore,
+                  (semaphore, MDS_KERNEL_TRACE_SEMAPHORE_TRY_ACQUIRE, err, timeout));
 
     MDS_LOG_D("[semaphore]thread(%p) acquire semephore(%p), value:%u", thread, semaphore,
               semaphore->value);
 
-    MDS_Err_t err = MDS_EOK;
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
     if (semaphore->value > 0) {
@@ -183,8 +165,8 @@ MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout
         MDS_CoreInterruptRestore(lock);
         err = MDS_ETIMEOUT;
     } else if (thread != NULL) {
-        MDS_LOG_D("[semaphore]suspend thread(%p) entry:%p timer wait:%lu", thread, thread->entry,
-                  timeout.ticks);
+        MDS_LOG_D("[semaphore]suspend thread(%p) entry:%p timer wait:%lu", thread,
+                  thread->entry, timeout.ticks);
 
         IPC_ListSuspendThread(&(semaphore->list), thread, true, timeout);
         MDS_CoreInterruptRestore(lock);
@@ -192,7 +174,8 @@ MDS_Err_t MDS_SemaphoreAcquire(MDS_Semaphore_t *semaphore, MDS_Timeout_t timeout
         err = thread->err;
     }
 
-    MDS_HOOK_CALL(SEMAPHORE_HAS_ACQUIRE, semaphore, err);
+    MDS_HOOK_CALL(KERNEL, semaphore,
+                  (semaphore, MDS_KERNEL_TRACE_SEMAPHORE_HAS_ACQUIRE, MDS_EOK, timeout));
 
     return (err);
 }
@@ -207,7 +190,9 @@ MDS_Err_t MDS_SemaphoreRelease(MDS_Semaphore_t *semaphore)
     MDS_Err_t err = MDS_EOK;
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
-    MDS_HOOK_CALL(SEMAPHORE_HAS_RELEASE, semaphore);
+    MDS_HOOK_CALL(
+        KERNEL, semaphore,
+        (semaphore, MDS_KERNEL_TRACE_SEMAPHORE_HAS_RELEASE, err, MDS_TIMEOUT_NO_WAIT));
 
     if (!MDS_ListIsEmpty(&(semaphore->list))) {
         IPC_ListResumeThread(&(semaphore->list));
@@ -295,7 +280,8 @@ MDS_Err_t MDS_ConditionSignal(MDS_Condition_t *condition)
     return (err);
 }
 
-MDS_Err_t MDS_ConditionWait(MDS_Condition_t *condition, MDS_Mutex_t *mutex, MDS_Timeout_t timeout)
+MDS_Err_t MDS_ConditionWait(MDS_Condition_t *condition, MDS_Mutex_t *mutex,
+                            MDS_Timeout_t timeout)
 {
     MDS_ASSERT(condition != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(condition->object)) == MDS_OBJECT_TYPE_SEMAPHORE);
@@ -338,7 +324,7 @@ MDS_Err_t MDS_MutexInit(MDS_Mutex_t *mutex, const char *name)
     MDS_Err_t err = MDS_ObjectInit(&(mutex->object), MDS_OBJECT_TYPE_MUTEX, name);
     if (err == MDS_EOK) {
         mutex->owner = NULL;
-        mutex->priority = MDS_KERNEL_THREAD_PRIORITY_MAX;
+        mutex->priority = CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX;
         mutex->value = 1;
         mutex->nest = 0;
         MDS_ListInitNode(&(mutex->list));
@@ -359,11 +345,11 @@ MDS_Err_t MDS_MutexDeInit(MDS_Mutex_t *mutex)
 
 MDS_Mutex_t *MDS_MutexCreate(const char *name)
 {
-    MDS_Mutex_t *mutex = (MDS_Mutex_t *)MDS_ObjectCreate(sizeof(MDS_Mutex_t),
-                                                         MDS_OBJECT_TYPE_MUTEX, name);
+    MDS_Mutex_t *mutex =
+        (MDS_Mutex_t *)MDS_ObjectCreate(sizeof(MDS_Mutex_t), MDS_OBJECT_TYPE_MUTEX, name);
     if (mutex != NULL) {
         mutex->owner = NULL;
-        mutex->priority = MDS_KERNEL_THREAD_PRIORITY_MAX;
+        mutex->priority = CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX;
         mutex->value = 1;
         mutex->nest = 0;
         MDS_ListInitNode(&(mutex->list));
@@ -387,18 +373,19 @@ MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Timeout_t timeout)
     MDS_ASSERT(mutex != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(mutex->object)) == MDS_OBJECT_TYPE_MUTEX);
 
+    MDS_Err_t err = MDS_EOK;
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
     if (thread == NULL) {
         MDS_LOG_W("[mutex]thread is null try to acquire mutex");
         return (MDS_EACCES);
     }
 
-    MDS_HOOK_CALL(MUTEX_TRY_ACQUIRE, mutex, timeout);
+    MDS_HOOK_CALL(KERNEL, mutex,
+                  (mutex, MDS_KERNEL_TRACE_MUTEX_TRY_ACQUIRE, err, timeout));
 
-    MDS_LOG_D("[mutex]thread(%p) entry:%p acquire mutex(%p) value:%u nest:%u onwer:%p", thread,
-              thread->entry, mutex, mutex->value, mutex->nest, mutex->owner);
+    MDS_LOG_D("[mutex]thread(%p) entry:%p acquire mutex(%p) value:%u nest:%u onwer:%p",
+              thread, thread->entry, mutex, mutex->value, mutex->nest, mutex->owner);
 
-    MDS_Err_t err = MDS_EOK;
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
     if (thread == mutex->owner) {
@@ -423,8 +410,8 @@ MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Timeout_t timeout)
         MDS_CoreInterruptRestore(lock);
         err = MDS_ETIMEOUT;
     } else {
-        MDS_LOG_D("[mutex]mutex suspend thread(%p) entry:%p timer wait:%lu", thread, thread->entry,
-                  timeout.ticks);
+        MDS_LOG_D("[mutex]mutex suspend thread(%p) entry:%p timer wait:%lu", thread,
+                  thread->entry, timeout.ticks);
 
         if (thread->currPrio < mutex->owner->currPrio) {
             MDS_ThreadChangePriority(mutex->owner, thread->currPrio);
@@ -435,7 +422,8 @@ MDS_Err_t MDS_MutexAcquire(MDS_Mutex_t *mutex, MDS_Timeout_t timeout)
         err = thread->err;
     }
 
-    MDS_HOOK_CALL(MUTEX_HAS_ACQUIRE, mutex, err);
+    MDS_HOOK_CALL(KERNEL, mutex,
+                  (mutex, MDS_KERNEL_TRACE_MUTEX_HAS_ACQUIRE, err, timeout));
 
     return (err);
 }
@@ -451,8 +439,8 @@ MDS_Err_t MDS_MutexRelease(MDS_Mutex_t *mutex)
         return (MDS_EACCES);
     }
 
-    MDS_LOG_D("[mutex]thread(%p) entry:%p release mutex(%p) value:%u nest:%u onwer:%p", thread,
-              thread->entry, mutex, mutex->value, mutex->nest, mutex->owner);
+    MDS_LOG_D("[mutex]thread(%p) entry:%p release mutex(%p) value:%u nest:%u onwer:%p",
+              thread, thread->entry, mutex, mutex->value, mutex->nest, mutex->owner);
 
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
@@ -462,7 +450,9 @@ MDS_Err_t MDS_MutexRelease(MDS_Mutex_t *mutex)
         return (MDS_EACCES);
     }
 
-    MDS_HOOK_CALL(MUTEX_HAS_RELEASE, mutex);
+    MDS_HOOK_CALL(
+        KERNEL, mutex,
+        (mutex, MDS_KERNEL_TRACE_MUTEX_HAS_RELEASE, MDS_EOK, MDS_TIMEOUT_NO_WAIT));
 
     mutex->nest -= 1;
     if (mutex->nest == 0) {
@@ -484,7 +474,7 @@ MDS_Err_t MDS_MutexRelease(MDS_Mutex_t *mutex)
             return (MDS_EOK);
         } else {
             mutex->owner = NULL;
-            mutex->priority = MDS_KERNEL_THREAD_PRIORITY_MAX;
+            mutex->priority = CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX;
             if (mutex->value < (__typeof__(mutex->value))(-1)) {
                 mutex->value += 1;
             } else {
@@ -574,8 +564,9 @@ MDS_Err_t MDS_RwLockAcquireRead(MDS_RwLock_t *rwlock, MDS_Timeout_t timeout)
     while ((rwlock->readers < 0) || (!MDS_ListIsEmpty(&(rwlock->condWr.list)))) {
         if (timeout.ticks != MDS_CLOCK_TICK_FOREVER) {
             MDS_Tick_t elapsedTick = MDS_ClockGetTickCount() - startTick;
-            timeout.ticks = (elapsedTick <= timeout.ticks) ? (timeout.ticks - elapsedTick)
-                                                           : (MDS_CLOCK_TICK_NO_WAIT);
+            timeout.ticks = (elapsedTick <= timeout.ticks) ?
+                                (timeout.ticks - elapsedTick) :
+                                (MDS_CLOCK_TICK_NO_WAIT);
         }
         err = MDS_ConditionWait(&(rwlock->condRd), &(rwlock->mutex), timeout);
         if (err != MDS_EOK) {
@@ -605,8 +596,9 @@ MDS_Err_t MDS_RwLockAcquireWrite(MDS_RwLock_t *rwlock, MDS_Timeout_t timeout)
     while (rwlock->readers != 0) {
         if (timeout.ticks != MDS_CLOCK_TICK_FOREVER) {
             MDS_Tick_t elapsedTick = MDS_ClockGetTickCount() - startTick;
-            timeout.ticks = (elapsedTick <= timeout.ticks) ? (timeout.ticks - elapsedTick)
-                                                           : (MDS_CLOCK_TICK_NO_WAIT);
+            timeout.ticks = (elapsedTick <= timeout.ticks) ?
+                                (timeout.ticks - elapsedTick) :
+                                (MDS_CLOCK_TICK_NO_WAIT);
         }
         err = MDS_ConditionWait(&(rwlock->condWr), &(rwlock->mutex), timeout);
         if (err != MDS_EOK) {
@@ -677,8 +669,8 @@ MDS_Err_t MDS_EventDeInit(MDS_Event_t *event)
 
 MDS_Event_t *MDS_EventCreate(const char *name)
 {
-    MDS_Event_t *event = (MDS_Event_t *)MDS_ObjectCreate(sizeof(MDS_Event_t),
-                                                         MDS_OBJECT_TYPE_EVENT, name);
+    MDS_Event_t *event =
+        (MDS_Event_t *)MDS_ObjectCreate(sizeof(MDS_Event_t), MDS_OBJECT_TYPE_EVENT, name);
     if (event != NULL) {
         event->value = 0U;
         MDS_ListInitNode(&(event->list));
@@ -697,8 +689,8 @@ MDS_Err_t MDS_EventDestroy(MDS_Event_t *event)
     return (MDS_ObjectDestory(&(event->object)));
 }
 
-MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS_Mask_t *recv,
-                        MDS_Timeout_t timeout)
+MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt,
+                        MDS_Mask_t *recv, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(event != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(event->object)) == MDS_OBJECT_TYPE_EVENT);
@@ -709,14 +701,15 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS
         return (MDS_EINVAL);
     }
 
+    MDS_Err_t err = MDS_EOK;
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
 
-    MDS_HOOK_CALL(EVENT_TRY_ACQUIRE, event, timeout);
+    MDS_HOOK_CALL(KERNEL, event,
+                  (event, MDS_KERNEL_TRACE_EVENT_TRY_ACQUIRE, err, timeout));
 
-    MDS_LOG_D("[event]thread(%p) wait event(%p) which value:%x mask:%x opt:%x", thread, event,
-              event->value, mask, opt);
+    MDS_LOG_D("[event]thread(%p) wait event(%p) which value:%x mask:%x opt:%x", thread,
+              event, event->value, mask, opt);
 
-    MDS_Err_t err = MDS_EOK;
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
     if ((((opt & MDS_EVENT_OPT_AND) != 0U) && ((event->value & mask) == mask)) ||
@@ -735,8 +728,8 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS
         MDS_CoreInterruptRestore(lock);
         err = MDS_ETIMEOUT;
     } else if (thread != NULL) {
-        MDS_LOG_D("[event]event suspend thread(%p) entry:%p timer wait:%lu", thread, thread->entry,
-                  timeout.ticks);
+        MDS_LOG_D("[event]event suspend thread(%p) entry:%p timer wait:%lu", thread,
+                  thread->entry, timeout.ticks);
 
         thread->eventMask = mask;
         thread->eventOpt = opt;
@@ -750,7 +743,8 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_Mask_t opt, MDS
         }
     }
 
-    MDS_HOOK_CALL(EVENT_HAS_ACQUIRE, event, err);
+    MDS_HOOK_CALL(KERNEL, event,
+                  (event, MDS_KERNEL_TRACE_EVENT_HAS_ACQUIRE, err, timeout));
 
     return (err);
 }
@@ -760,13 +754,15 @@ MDS_Err_t MDS_EventSet(MDS_Event_t *event, MDS_Mask_t mask)
     MDS_ASSERT(event != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(event->object)) == MDS_OBJECT_TYPE_EVENT);
 
+    MDS_Err_t err = MDS_EOK;
+
     MDS_LOG_D("[event]event(%p) which value:%x set mask:%x", event, event->value, mask);
 
     MDS_Thread_t *iter = NULL;
-    MDS_Err_t err = MDS_EOK;
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
-    MDS_HOOK_CALL(EVENT_HAS_SET, event, mask);
+    MDS_HOOK_CALL(KERNEL, event,
+                  (event, MDS_KERNEL_TRACE_EVENT_HAS_SET, err, MDS_TIMEOUT_TICKS(mask)));
 
     event->value |= mask;
     MDS_LIST_FOREACH_NEXT (iter, node, &(event->list)) {
@@ -808,7 +804,9 @@ MDS_Err_t MDS_EventClr(MDS_Event_t *event, MDS_Mask_t mask)
 
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
-    MDS_HOOK_CALL(EVENT_HAS_CLR, event, mask);
+    MDS_HOOK_CALL(KERNEL, event,
+                  (event, MDS_KERNEL_TRACE_EVENT_HAS_CLR, MDS_EOK,
+                   (MDS_Timeout_t) {.ticks = mask}));
 
     event->value &= (MDS_Mask_t)(~mask);
 
@@ -845,8 +843,8 @@ static void MDS_MsgQueueListInit(MDS_MsgQueue_t *msgQueue, size_t msgNums)
 
     for (size_t idx = 0; idx < msgNums; idx++) {
         MDS_MsgQueueHeader_t *list = (MDS_MsgQueueHeader_t *)(&(
-            ((uint8_t *)(msgQueue->queBuff))[idx *
-                                             (sizeof(MDS_MsgQueueHeader_t) + msgQueue->msgSize)]));
+            ((uint8_t *)(msgQueue->queBuff))[idx * (sizeof(MDS_MsgQueueHeader_t) +
+                                                    msgQueue->msgSize)]));
         list->next = (MDS_MsgQueueHeader_t *)(msgQueue->lfree);
         msgQueue->lfree = list;
     }
@@ -862,12 +860,12 @@ MDS_Err_t MDS_MsgQueueInit(MDS_MsgQueue_t *msgQueue, const char *name, void *que
     MDS_Err_t err = MDS_ObjectInit(&(msgQueue->object), MDS_OBJECT_TYPE_MSGQUEUE, name);
     if (err == MDS_EOK) {
         msgQueue->queBuff = queBuff;
-        msgQueue->msgSize = VALUE_ALIGN(msgSize + MDS_SYSMEM_ALIGN_SIZE - 1,
-                                        MDS_SYSMEM_ALIGN_SIZE);
+        msgQueue->msgSize =
+            VALUE_ALIGN(msgSize + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
         MDS_ListInitNode(&(msgQueue->listRecv));
         MDS_ListInitNode(&(msgQueue->listSend));
-        MDS_MsgQueueListInit(msgQueue,
-                             bufSize / (msgQueue->msgSize + sizeof(MDS_MsgQueueHeader_t)));
+        MDS_MsgQueueListInit(
+            msgQueue, bufSize / (msgQueue->msgSize + sizeof(MDS_MsgQueueHeader_t)));
     }
 
     return (err);
@@ -888,14 +886,14 @@ MDS_MsgQueue_t *MDS_MsgQueueCreate(const char *name, size_t msgSize, size_t msgN
 {
     MDS_ASSERT(msgSize <= ((__typeof__(((MDS_MsgQueueHeader_t *)0)->len))(-1)));
 
-    MDS_MsgQueue_t *msgQueue = (MDS_MsgQueue_t *)MDS_ObjectCreate(sizeof(MDS_MsgQueue_t),
-                                                                  MDS_OBJECT_TYPE_MSGQUEUE, name);
+    MDS_MsgQueue_t *msgQueue = (MDS_MsgQueue_t *)MDS_ObjectCreate(
+        sizeof(MDS_MsgQueue_t), MDS_OBJECT_TYPE_MSGQUEUE, name);
 
     if (msgQueue != NULL) {
-        msgQueue->msgSize = VALUE_ALIGN(msgSize + MDS_SYSMEM_ALIGN_SIZE - 1,
-                                        MDS_SYSMEM_ALIGN_SIZE);
-        msgQueue->queBuff = MDS_SysMemAlloc((msgQueue->msgSize + sizeof(MDS_MsgQueueHeader_t)) *
-                                            msgNums);
+        msgQueue->msgSize =
+            VALUE_ALIGN(msgSize + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
+        msgQueue->queBuff =
+            MDS_SysMemAlloc((msgQueue->msgSize + sizeof(MDS_MsgQueueHeader_t)) * msgNums);
         if (msgQueue->queBuff == NULL) {
             MDS_ObjectDestory(&(msgQueue->object));
             return (NULL);
@@ -927,11 +925,12 @@ MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *
     MDS_ASSERT(msgQueue != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(msgQueue->object)) == MDS_OBJECT_TYPE_MSGQUEUE);
 
+    MDS_Err_t err = MDS_EOK;
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
 
-    MDS_HOOK_CALL(MSGQUEUE_TRY_RECV, msgQueue, timeout);
+    MDS_HOOK_CALL(KERNEL, msgqueue,
+                  (msgQueue, MDS_KERNEL_TRACE_MSGQUEUE_TRY_RECV, err, timeout));
 
-    MDS_Err_t err = MDS_EOK;
     MDS_MsgQueueHeader_t *msg = NULL;
     MDS_Item_t lock = MDS_CoreInterruptLock();
     do {
@@ -946,8 +945,9 @@ MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *
                 break;
             }
 
-            MDS_LOG_D("[msgqueue]msgqueue(%p) recv suspend thread(%p) entry:%p timer wait:%lu",
-                      msgQueue, thread, thread->entry, timeout.ticks);
+            MDS_LOG_D(
+                "[msgqueue]msgqueue(%p) recv suspend thread(%p) entry:%p timer wait:%lu",
+                msgQueue, thread, thread->entry, timeout.ticks);
         }
 
         while (msgQueue->lhead == NULL) {
@@ -967,7 +967,8 @@ MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *
     } while (0);
     MDS_CoreInterruptRestore(lock);
 
-    MDS_HOOK_CALL(MSGQUEUE_HAS_RECV, msgQueue, err);
+    MDS_HOOK_CALL(KERNEL, msgqueue,
+                  (msgQueue, MDS_KERNEL_TRACE_MSGQUEUE_HAS_RECV, err, timeout));
 
     if (err == MDS_EOK) {
         if (recv != NULL) {
@@ -977,8 +978,8 @@ MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, size_t *
             *len = msg->len;
         }
 
-        MDS_LOG_D("[msgqueue]thread[(%p) recv message from msgqueue(%p) len:%u", thread, msgQueue,
-                  msg->len);
+        MDS_LOG_D("[msgqueue]thread[(%p) recv message from msgqueue(%p) len:%u", thread,
+                  msgQueue, msg->len);
     }
 
     return (err);
@@ -1015,8 +1016,8 @@ MDS_Err_t MDS_MsgQueueRecvRelease(MDS_MsgQueue_t *msgQueue, void *recv)
     return (MDS_EOK);
 }
 
-MDS_Err_t MDS_MsgQueueRecvCopy(MDS_MsgQueue_t *msgQueue, void *buff, size_t size, size_t *len,
-                               MDS_Timeout_t timeout)
+MDS_Err_t MDS_MsgQueueRecvCopy(MDS_MsgQueue_t *msgQueue, void *buff, size_t size,
+                               size_t *len, MDS_Timeout_t timeout)
 {
     MDS_ASSERT(buff != NULL);
     MDS_ASSERT(size > 0);
@@ -1048,11 +1049,12 @@ MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msg
         return (MDS_EINVAL);
     }
 
+    MDS_Err_t err = MDS_EOK;
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
 
-    MDS_HOOK_CALL(MSGQUEUE_TRY_SEND, msgQueue, timeout);
+    MDS_HOOK_CALL(KERNEL, msgqueue,
+                  (msgQueue, MDS_KERNEL_TRACE_MSGQUEUE_TRY_SEND, err, timeout));
 
-    MDS_Err_t err = MDS_EOK;
     MDS_MsgQueueHeader_t *msg = NULL;
     MDS_Item_t lock = MDS_CoreInterruptLock();
     do {
@@ -1067,8 +1069,9 @@ MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msg
                 break;
             }
 
-            MDS_LOG_D("[msgqueue]msgqueue(%p) send suspend thread(%p) entry:%p timer wait:%lu",
-                      msgQueue, thread, thread->entry, timeout.ticks);
+            MDS_LOG_D(
+                "[msgqueue]msgqueue(%p) send suspend thread(%p) entry:%p timer wait:%lu",
+                msgQueue, thread, thread->entry, timeout.ticks);
         }
 
         while (msgQueue->lfree == NULL) {
@@ -1086,7 +1089,8 @@ MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msg
     } while (0);
     MDS_CoreInterruptRestore(lock);
 
-    MDS_HOOK_CALL(MSGQUEUE_HAS_SEND, msgQueue, err);
+    MDS_HOOK_CALL(KERNEL, msgqueue,
+                  (msgQueue, MDS_KERNEL_TRACE_MSGQUEUE_HAS_SEND, err, timeout));
 
     if (err != MDS_EOK) {
         return ((err == MDS_ETIMEOUT) ? (MDS_ERANGE) : (err));
@@ -1139,9 +1143,12 @@ MDS_Err_t MDS_MsgQueueUrgentMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *m
         return (MDS_EINVAL);
     }
 
-    MDS_HOOK_CALL(MSGQUEUE_TRY_SEND, msgQueue, MDS_TIMEOUT_NO_WAIT);
-
     MDS_Err_t err = MDS_EOK;
+
+    MDS_HOOK_CALL(
+        KERNEL, msgqueue,
+        (msgQueue, MDS_KERNEL_TRACE_MSGQUEUE_TRY_SEND, err, MDS_TIMEOUT_NO_WAIT));
+
     MDS_Item_t lock = MDS_CoreInterruptLock();
 
     MDS_MsgQueueHeader_t *msg = (MDS_MsgQueueHeader_t *)(msgQueue->lfree);
@@ -1153,7 +1160,9 @@ MDS_Err_t MDS_MsgQueueUrgentMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *m
 
     MDS_CoreInterruptRestore(lock);
 
-    MDS_HOOK_CALL(MSGQUEUE_HAS_SEND, msgQueue, err);
+    MDS_HOOK_CALL(
+        KERNEL, msgqueue,
+        (msgQueue, MDS_KERNEL_TRACE_MSGQUEUE_HAS_SEND, err, MDS_TIMEOUT_NO_WAIT));
 
     if (err != MDS_EOK) {
         return (err);
@@ -1251,8 +1260,8 @@ static void MDS_MemPoolListInit(MDS_MemPool_t *memPool, size_t blkNums)
     }
 }
 
-MDS_Err_t MDS_MemPoolInit(MDS_MemPool_t *memPool, const char *name, void *memBuff, size_t bufSize,
-                          size_t blkSize)
+MDS_Err_t MDS_MemPoolInit(MDS_MemPool_t *memPool, const char *name, void *memBuff,
+                          size_t bufSize, size_t blkSize)
 {
     MDS_ASSERT(memPool != NULL);
     MDS_ASSERT(bufSize > (sizeof(union MDS_MemPoolHeader) + blkSize));
@@ -1261,9 +1270,10 @@ MDS_Err_t MDS_MemPoolInit(MDS_MemPool_t *memPool, const char *name, void *memBuf
     if (err == MDS_EOK) {
         MDS_ListInitNode(&(memPool->list));
         memPool->memBuff = memBuff;
-        memPool->blkSize = VALUE_ALIGN(blkSize + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
-        MDS_MemPoolListInit(memPool,
-                            bufSize / (memPool->blkSize + sizeof(union MDS_MemPoolHeader)));
+        memPool->blkSize =
+            VALUE_ALIGN(blkSize + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
+        MDS_MemPoolListInit(
+            memPool, bufSize / (memPool->blkSize + sizeof(union MDS_MemPoolHeader)));
     }
 
     return (err);
@@ -1281,13 +1291,14 @@ MDS_Err_t MDS_MemPoolDeInit(MDS_MemPool_t *memPool)
 
 MDS_MemPool_t *MDS_MemPoolCreate(const char *name, size_t blkSize, size_t blkNums)
 {
-    MDS_MemPool_t *memPool = (MDS_MemPool_t *)MDS_ObjectCreate(sizeof(MDS_MemPool_t),
-                                                               MDS_OBJECT_TYPE_MEMPOOL, name);
+    MDS_MemPool_t *memPool = (MDS_MemPool_t *)MDS_ObjectCreate(
+        sizeof(MDS_MemPool_t), MDS_OBJECT_TYPE_MEMPOOL, name);
 
     if (memPool != NULL) {
-        memPool->blkSize = VALUE_ALIGN(blkSize + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
-        memPool->memBuff = MDS_SysMemAlloc((memPool->blkSize + sizeof(MDS_MsgQueueHeader_t)) *
-                                           blkNums);
+        memPool->blkSize =
+            VALUE_ALIGN(blkSize + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
+        memPool->memBuff =
+            MDS_SysMemAlloc((memPool->blkSize + sizeof(MDS_MsgQueueHeader_t)) * blkNums);
         if (memPool->memBuff == NULL) {
             MDS_ObjectDestory(&(memPool->object));
             return (NULL);
@@ -1316,11 +1327,13 @@ void *MDS_MemPoolAlloc(MDS_MemPool_t *memPool, MDS_Timeout_t timeout)
     MDS_ASSERT(memPool != NULL);
     MDS_ASSERT(MDS_ObjectGetType(&(memPool->object)) == MDS_OBJECT_TYPE_MEMPOOL);
 
-    MDS_HOOK_CALL(MEMPOOL_TRY_ALLOC, memPool, timeout);
+    MDS_Err_t err = MDS_EOK;
+
+    MDS_HOOK_CALL(KERNEL, mempool,
+                  (memPool, MDS_KERNEL_TRACE_MEMPOOL_TRY_ALLOC, err, timeout, NULL));
 
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
 
-    MDS_Err_t err = MDS_EOK;
     union MDS_MemPoolHeader *blk = NULL;
     MDS_Item_t lock = MDS_CoreInterruptLock();
     do {
@@ -1355,7 +1368,8 @@ void *MDS_MemPoolAlloc(MDS_MemPool_t *memPool, MDS_Timeout_t timeout)
     } while (0);
     MDS_CoreInterruptRestore(lock);
 
-    MDS_HOOK_CALL(MEMPOOL_HAS_ALLOC, memPool, blk);
+    MDS_HOOK_CALL(KERNEL, mempool,
+                  (memPool, MDS_KERNEL_TRACE_MEMPOOL_HAS_ALLOC, err, timeout, blk));
 
     return (((err == MDS_EOK) && (blk != NULL)) ? ((void *)(blk + 1)) : (NULL));
 }
@@ -1382,9 +1396,12 @@ static void MDS_MemPoolFreeBlk(union MDS_MemPoolHeader *blk)
         MDS_CoreInterruptRestore(lock);
     }
 
-    MDS_HOOK_CALL(MEMPOOL_HAS_FREE, memPool, blk);
+    MDS_HOOK_CALL(
+        KERNEL, mempool,
+        (memPool, MDS_KERNEL_TRACE_MEMPOOL_HAS_FREE, MDS_EOK, MDS_TIMEOUT_NO_WAIT, blk));
 
-    MDS_LOG_D("[mempool]free block to mempool(%p) which blksize:%u", memPool, memPool->blkSize);
+    MDS_LOG_D("[mempool]free block to mempool(%p) which blksize:%u", memPool,
+              memPool->blkSize);
 }
 
 void MDS_MemPoolFree(void *blkPtr)
@@ -1393,8 +1410,8 @@ void MDS_MemPoolFree(void *blkPtr)
         return;
     }
 
-    union MDS_MemPoolHeader *blk = (union MDS_MemPoolHeader *)((uint8_t *)blkPtr -
-                                                               sizeof(union MDS_MemPoolHeader));
+    union MDS_MemPoolHeader *blk =
+        (union MDS_MemPoolHeader *)((uint8_t *)blkPtr - sizeof(union MDS_MemPoolHeader));
     if (blk != NULL) {
         MDS_MemPoolFreeBlk(blk);
     }

@@ -15,8 +15,8 @@
 /* Variable ---------------------------------------------------------------- */
 static volatile MDS_Tick_t g_sysClockTickCount = 0U;
 
-static int8_t g_unixTimeZone = MDS_CLOCK_TIMEZONE_DEFAULT;
-static MDS_Time_t g_unixTimeBase = MDS_CLOCK_TIMESTAMP_DEFAULT;
+static int8_t g_unixTimeZone = CONFIG_MDS_CLOCK_TIMEZONE_DEFAULT;
+static MDS_Time_t g_unixTimeBase = CONFIG_MDS_CLOCK_TIMESTAMP_DEFAULT;
 
 /* Function ---------------------------------------------------------------- */
 MDS_Tick_t MDS_ClockGetTickCount(void)

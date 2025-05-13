@@ -19,8 +19,8 @@
 #include <stdarg.h>
 #include <string.h>
 
-#ifdef MDS_CONFIG_FILE
-#include MDS_CONFIG_FILE
+#ifdef CONFIG_MDS_CONFIG_FILE
+#include CONFIG_MDS_CONFIG_FILE
 #endif
 
 #ifdef __cplusplus
@@ -28,10 +28,12 @@ extern "C" {
 #endif
 
 /* Typedef ----------------------------------------------------------------- */
-#if (defined(MDS_TICK_WITH_64BIT) && (MDS_TICK_WITH_64BIT))
+#if (defined(CONFIG_MDS_TICK_LLU) && (CONFIG_MDS_TICK_LLU))
 typedef uint64_t MDS_Tick_t;
+#define MDS_TICK_FMT "%llu"
 #else
 typedef uint32_t MDS_Tick_t;
+#define MDS_TICK_FMT "%lu"
 #endif
 
 typedef int64_t MDS_Time_t;
@@ -137,15 +139,43 @@ static inline bool MDS_ListIsEmpty(const MDS_ListNode_t *node)
     return (node->prev == node);
 }
 
-static inline size_t MDS_ListGetLength(const MDS_ListNode_t *list)
+static inline size_t MDS_ListGetCount(const MDS_ListNode_t *list)
 {
-    size_t len = 0;
+    size_t cnt = 0;
 
     for (MDS_ListNode_t *node = list->next; node != list; node = node->next) {
-        len += 1;
+        cnt += 1;
     }
 
-    return (len);
+    return (cnt);
+}
+
+static inline MDS_ListNode_t *MDS_ListForeachNext(const MDS_ListNode_t *list,
+                                                  int (*cmp)(const MDS_ListNode_t *, void *),
+                                                  void *arg)
+{
+    for (MDS_ListNode_t *node = list->next, *next = node->next; (node != list) && (node != NULL);
+         node = next, next = node->next) {
+        if (cmp(node, arg) == 0) {
+            return (node);
+        }
+    }
+
+    return (NULL);
+}
+
+static inline MDS_ListNode_t *MDS_ListForeachPrev(const MDS_ListNode_t *list,
+                                                  int (*cmp)(const MDS_ListNode_t *, void *),
+                                                  void *arg)
+{
+    for (MDS_ListNode_t *node = list->prev, *prev = node->prev; (node != list) && (node != NULL);
+         node = prev, prev = node->prev) {
+        if (cmp(node, arg) == 0) {
+            return (node);
+        }
+    }
+
+    return (NULL);
 }
 
 #define MDS_LIST_FOREACH_NEXT(iter, member, head)                                                 \
