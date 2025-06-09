@@ -13,56 +13,37 @@
 #include "kernel.h"
 
 /* Variable ---------------------------------------------------------------- */
-static volatile MDS_Tick_t g_sysClockTickCount = 0U;
-
-static int8_t g_unixTimeZone = CONFIG_MDS_CLOCK_TIMEZONE_DEFAULT;
-static MDS_Time_t g_unixTimeBase = CONFIG_MDS_CLOCK_TIMESTAMP_DEFAULT;
+static struct MDS_SysTick {
+    volatile MDS_Tick_t tickcount;
+    MDS_SpinLock_t spinlock;
+} g_sysTick;
 
 /* Function ---------------------------------------------------------------- */
+void MDS_SysTickHandler(void)
+{
+    MDS_ClockIncTickCount(1);
+}
+
 MDS_Tick_t MDS_ClockGetTickCount(void)
 {
-    return (g_sysClockTickCount);
+    // atomic_load();
+    return (g_sysTick.tickcount);
 }
 
-void MDS_ClockSetTickCount(MDS_Tick_t tickcnt)
+void MDS_ClockIncTickCount(MDS_Tick_t ticks)
 {
-    MDS_Item_t lock = MDS_CoreInterruptLock();
+    // atomic_add all cpu?
 
-    g_sysClockTickCount = tickcnt;
-
+    MDS_Lock_t lock = MDS_CoreInterruptLock();
+    MDS_Err_t err = MDS_SpinLockAcquire(&(g_sysTick.spinlock));
+    if (err == MDS_EOK) {
+        // atomic_add
+        g_sysTick.tickcount += ticks;
+    }
+    MDS_SpinLockRelease(&(g_sysTick.spinlock));
     MDS_CoreInterruptRestore(lock);
-}
 
-void MDS_ClockIncTickCount(void)
-{
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-
-    g_sysClockTickCount += 1U;
-
-    MDS_KernelRemainThread();
-
-    MDS_CoreInterruptRestore(lock);
+    MDS_ThreadRemainTicks(ticks);
 
     MDS_SysTimerCheck();
 }
-
-MDS_Time_t MDS_ClockGetTimestamp(int8_t *tz)
-{
-    MDS_Tick_t ticks = MDS_ClockGetTickCount();
-    MDS_Time_t ts = g_unixTimeBase + MDS_CLOCK_TICK_TO_MS(ticks);
-
-    if (tz != NULL) {
-        *tz = g_unixTimeZone;
-    }
-
-    return (ts);
-}
-
-void MDS_ClockSetTimestamp(MDS_Time_t ts, int8_t tz)
-{
-    MDS_Tick_t ticks = MDS_ClockGetTickCount();
-
-    g_unixTimeBase = ts - MDS_CLOCK_TICK_TO_MS(ticks);
-    g_unixTimeZone = tz;
-}
-

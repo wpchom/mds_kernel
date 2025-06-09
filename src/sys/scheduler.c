@@ -22,7 +22,7 @@ MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 /* Variable ---------------------------------------------------------------- */
 static volatile uint32_t g_sysThreadPrioMask = 0x00U;
-static MDS_ListNode_t g_sysSchedulerTable[CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX];
+static MDS_DListNode_t g_sysSchedulerTable[CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX];
 
 /* Function ---------------------------------------------------------------- */
 __attribute__((weak)) size_t MDS_SchedulerFFS(uint32_t value)
@@ -63,7 +63,7 @@ __attribute__((weak)) size_t MDS_SchedulerFFS(uint32_t value)
 
 void MDS_SchedulerInit(void)
 {
-    MDS_LOG_D("[scheduler]init with max priority:%u", ARRAY_SIZE(g_sysSchedulerTable));
+    MDS_LOG_D("[scheduler] init with max priority:%zu", ARRAY_SIZE(g_sysSchedulerTable));
 
     g_sysThreadPrioMask = 0U;
     MDS_SkipListInitNode(g_sysSchedulerTable, ARRAY_SIZE(g_sysSchedulerTable));
@@ -71,47 +71,46 @@ void MDS_SchedulerInit(void)
 
 void MDS_SchedulerInsertThread(MDS_Thread_t *thread)
 {
-    if (MDS_KernelCurrentThread() == thread) {
-        thread->state = (thread->state & ~MDS_THREAD_STATE_MASK) | MDS_THREAD_STATE_RUNNING;
-        return;
-    }
+    MDS_DListRemoveNode(&(thread->nodeWait.node));
 
-    thread->state = (thread->state & ~MDS_THREAD_STATE_MASK) | MDS_THREAD_STATE_READY;
-
-    MDS_ListRemoveNode(&(thread->node));
-
-    if (thread->currPrio < CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) {
-        if ((thread->state & MDS_THREAD_FLAG_YIELD) != 0U) {
-            MDS_ListInsertNodePrev(&(g_sysSchedulerTable[thread->currPrio]), &(thread->node));
+    if (thread->currPrio.priority < CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) {
+        if (MDS_ThreadIsYield(thread)) {
+            MDS_DListInsertNodePrev(&(g_sysSchedulerTable[thread->currPrio.priority]),
+                                    &(thread->nodeWait.node));
         } else {
-            MDS_ListInsertNodeNext(&(g_sysSchedulerTable[thread->currPrio]), &(thread->node));
+            MDS_DListInsertNodeNext(&(g_sysSchedulerTable[thread->currPrio.priority]),
+                                    &(thread->nodeWait.node));
         }
-        g_sysThreadPrioMask |= (1UL << thread->currPrio);
+        g_sysThreadPrioMask |= (1UL << thread->currPrio.priority);
     }
 
     MDS_LOG_D("[scheduler] insert thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry,
-              thread->stackPoint, thread->currPrio);
+              thread->stackPoint, thread->currPrio.priority);
 }
 
 void MDS_SchedulerRemoveThread(MDS_Thread_t *thread)
 {
     MDS_LOG_D("[scheduler] remove thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry,
-              thread->stackPoint, thread->currPrio);
+              thread->stackPoint, thread->currPrio.priority);
 
-    MDS_ListRemoveNode(&(thread->node));
+    MDS_DListRemoveNode(&(thread->nodeWait.node));
 
-    if ((thread->currPrio < CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&
-        (MDS_ListIsEmpty(&(g_sysSchedulerTable[thread->currPrio])))) {
-        g_sysThreadPrioMask &= ~(1UL << thread->currPrio);
+    if ((thread->currPrio.priority < CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&
+        (MDS_DListIsEmpty(&(g_sysSchedulerTable[thread->currPrio.priority])))) {
+        g_sysThreadPrioMask &= ~(1UL << thread->currPrio.priority);
     }
 }
 
-MDS_Thread_t *MDS_SchedulerHighestPriorityThread(void)
+MDS_Thread_t *MDS_SchedulerPeekThread(void)
 {
     MDS_Thread_t *thread = NULL;
+
     size_t highestPrio = MDS_SchedulerFFS(g_sysThreadPrioMask);
     if (highestPrio != 0U) {
-        thread = CONTAINER_OF(g_sysSchedulerTable[highestPrio - 1].next, MDS_Thread_t, node);
+        thread = CONTAINER_OF(g_sysSchedulerTable[highestPrio - 1].next, MDS_Thread_t,
+                              nodeWait.node);
+    } else {
+        thread = MDS_KernelIdleThread();
     }
 
     return (thread);

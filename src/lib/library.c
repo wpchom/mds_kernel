@@ -14,46 +14,46 @@
 #include "mds_log.h"
 
 /* Skip List --------------------------------------------------------------- */
-void MDS_SkipListInitNode(MDS_ListNode_t node[], size_t size)
+void MDS_SkipListInitNode(MDS_DListNode_t node[], size_t size)
 {
     MDS_ASSERT(node != NULL);
 
     for (size_t level = 0; level < size; level++) {
-        MDS_ListInitNode(&(node[level]));
+        MDS_DListInitNode(&(node[level]));
     }
 }
 
-void MDS_SkipListRemoveNode(MDS_ListNode_t node[], size_t size)
+void MDS_SkipListRemoveNode(MDS_DListNode_t node[], size_t size)
 {
     MDS_ASSERT(node != NULL);
     UNUSED(size);
 
     for (size_t level = 0; level < size; level++) {
-        MDS_ListRemoveNode(&(node[level]));
+        MDS_DListRemoveNode(&(node[level]));
     }
 }
 
-bool MDS_SkipListIsEmpty(MDS_ListNode_t node[], size_t size)
+bool MDS_SkipListIsEmpty(MDS_DListNode_t node[], size_t size)
 {
     MDS_ASSERT(node != NULL);
     UNUSED(size);
 
-    return (MDS_ListIsEmpty(&(node[0])));
+    return (MDS_DListIsEmpty(&(node[0])));
 }
 
-MDS_ListNode_t *MDS_SkipListSearchNode(
-    MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size, const void *value,
-    int (*compare)(const MDS_ListNode_t *node, const void *value))
+MDS_DListNode_t *MDS_SkipListSearchNode(
+    MDS_DListNode_t *last[], MDS_DListNode_t list[], size_t size, const void *value,
+    int (*compare)(const MDS_DListNode_t *node, const void *value))
 {
     MDS_ASSERT(last != NULL);
     MDS_ASSERT(list != NULL);
     MDS_ASSERT(size > 0);
     MDS_ASSERT(compare != NULL);
-    MDS_ListNode_t *skip = list;
+    MDS_DListNode_t *skip = list;
 
     for (size_t level = 0; level < size; level++) {
         for (; skip->next != &(list[level]); skip = skip->next) {
-            const MDS_ListNode_t *node = skip->next - level;
+            const MDS_DListNode_t *node = skip->next - level;
             if (compare(node, value) > 0) {
                 break;
             }
@@ -71,7 +71,7 @@ MDS_ListNode_t *MDS_SkipListSearchNode(
     return ((skip != &(list[0])) ? (skip) : (NULL));
 }
 
-size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size,
+size_t MDS_SkipListInsertNode(MDS_DListNode_t *last[], MDS_DListNode_t node[], size_t size,
                               size_t rand, size_t shift)
 {
     MDS_ASSERT(last != NULL);
@@ -81,7 +81,7 @@ size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], siz
     size_t level = 1;
 
     do {
-        MDS_ListInsertNodeNext(last[size - level], &(node[size - level]));
+        MDS_DListInsertNodeNext(last[size - level], &(node[size - level]));
         rand >>= shift;
     } while ((++level <= size) && !(rand & ((1UL << shift) - 1U)));
 
@@ -94,8 +94,8 @@ void MDS_TreeInitNode(MDS_TreeNode_t *node)
     MDS_ASSERT(node != NULL);
 
     node->parent = NULL;
-    MDS_ListInitNode(&(node->child));
-    MDS_ListInitNode(&(node->sibling));
+    MDS_DListInitNode(&(node->child));
+    MDS_DListInitNode(&(node->sibling));
 }
 
 MDS_TreeNode_t *MDS_TreeInsertNode(MDS_TreeNode_t *parent, MDS_TreeNode_t *node)
@@ -105,7 +105,7 @@ MDS_TreeNode_t *MDS_TreeInsertNode(MDS_TreeNode_t *parent, MDS_TreeNode_t *node)
     if (tree == NULL) {
         tree = node;
     } else if (node != NULL) {
-        MDS_ListInsertNodeNext(&(tree->child), &(node->sibling));
+        MDS_DListInsertNodeNext(&(tree->child), &(node->sibling));
         node->parent = tree;
     }
 
@@ -114,11 +114,11 @@ MDS_TreeNode_t *MDS_TreeInsertNode(MDS_TreeNode_t *parent, MDS_TreeNode_t *node)
 
 MDS_TreeNode_t *MDS_TreeRemoveNode(MDS_TreeNode_t *node)
 {
-    if ((node == NULL) || (!MDS_ListIsEmpty(&(node->child)))) {
+    if ((node == NULL) || (!MDS_DListIsEmpty(&(node->child)))) {
         return (NULL);
     }
 
-    MDS_ListRemoveNode(&(node->sibling));
+    MDS_DListRemoveNode(&(node->sibling));
     node->parent = NULL;
 
     return (node);
@@ -1037,62 +1037,64 @@ int MDS_Sscanf(const char *buff, const char *fmt, ...)
 static const int16_t G_YDAYS_OF_MONTH[] = {
     -1, 30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333, 364};
 
-MDS_Time_t MDS_TIME_ChangeTimeStamp(MDS_TimeDate_t *tm, int8_t tz)
+MDS_TimeStamp_t MDS_TIME_ChangeTimeStamp(MDS_TimeDate_t *tm, int8_t tz)
 {
-    MDS_Time_t tmp = ((tm->year - TIME_UNIX_YEAR_BEGIN) * MDS_TIME_DAY_OF_YEAR) +
-                     TIME_GET_YEARDAYS(tm->year);
+    MDS_TimeStamp_t tmp = {.ts = ((tm->year - TIME_UNIX_YEAR_BEGIN) * MDS_TIME_DAY_OF_YEAR) +
+                                 TIME_GET_YEARDAYS(tm->year)};
 
     tm->yday = tm->mday + G_YDAYS_OF_MONTH[tm->month - 1];
     if ((tm->month > MDS_TIME_MONTH_FEB) && (TIME_IS_LEAPYEAR(tm->year))) {
         tm->yday += 1;
     }
 
-    tmp = (tmp + tm->yday) * MDS_TIME_SEC_OF_DAY + MDS_TIME_SEC_OF_HOUR * (tz + tm->hour) +
-          MDS_TIME_SEC_OF_MIN * tm->minute + tm->second;
+    tmp.ts = (tmp.ts + tm->yday) * MDS_TIME_SEC_OF_DAY + MDS_TIME_SEC_OF_HOUR * (tz + tm->hour) +
+             MDS_TIME_SEC_OF_MIN * tm->minute + tm->second;
 
-    return (tmp * MDS_TIME_MSEC_OF_SEC + tm->msec);
+    tmp.ts = (tmp.ts * MDS_TIME_MSEC_OF_SEC) + tm->msec;
+
+    return (tmp);
 }
 
-void MDS_TIME_ChangeTimeDate(MDS_TimeDate_t *tm, MDS_Time_t timestamp, int8_t tz)
+void MDS_TIME_ChangeTimeDate(MDS_TimeDate_t *tm, MDS_TimeStamp_t ts, int8_t tz)
 {
-    MDS_Time_t tmp = timestamp + (MDS_Time_t)tz * MDS_TIME_MSEC_OF_SEC * MDS_TIME_SEC_OF_HOUR;
+    MDS_TimeStamp_t tmp = {.ts = ts.ts + tz * MDS_TIME_MSEC_OF_SEC * MDS_TIME_SEC_OF_HOUR * tz};
 
-    tm->msec = tmp % MDS_TIME_MSEC_OF_SEC;
-    tmp /= MDS_TIME_MSEC_OF_SEC;
-    tm->second = tmp % MDS_TIME_SEC_OF_MIN;
-    tmp /= MDS_TIME_SEC_OF_MIN;
-    tm->minute = tmp % MDS_TIME_MIN_OF_HOUR;
-    tmp /= MDS_TIME_MIN_OF_HOUR;
-    tm->hour = tmp % MDS_TIME_HOUR_OF_DAY;
-    tmp /= MDS_TIME_HOUR_OF_DAY;
-    tm->wday = (TIME_UNIX_WEEKDAY_BEGIN + tmp) % MDS_TIME_DAY_OF_WEEK;
-    for (tm->year = TIME_UNIX_YEAR_BEGIN; tmp > 0; (tm->year)++) {
+    tm->msec = tmp.ts % MDS_TIME_MSEC_OF_SEC;
+    tmp.ts /= MDS_TIME_MSEC_OF_SEC;
+    tm->second = tmp.ts % MDS_TIME_SEC_OF_MIN;
+    tmp.ts /= MDS_TIME_SEC_OF_MIN;
+    tm->minute = tmp.ts % MDS_TIME_MIN_OF_HOUR;
+    tmp.ts /= MDS_TIME_MIN_OF_HOUR;
+    tm->hour = tmp.ts % MDS_TIME_HOUR_OF_DAY;
+    tmp.ts /= MDS_TIME_HOUR_OF_DAY;
+    tm->wday = (TIME_UNIX_WEEKDAY_BEGIN + tmp.ts) % MDS_TIME_DAY_OF_WEEK;
+    for (tm->year = TIME_UNIX_YEAR_BEGIN; tmp.ts > 0; (tm->year)++) {
         int16_t yday = (TIME_IS_LEAPYEAR(tm->year)) ? (MDS_TIME_DAY_OF_YEAR + 1)
                                                     : (MDS_TIME_DAY_OF_YEAR);
-        if (tmp >= yday) {
-            tmp -= yday;
+        if (tmp.ts >= yday) {
+            tmp.ts -= yday;
         } else {
             break;
         }
     }
-    tm->yday = tmp + 1;
+    tm->yday = tmp.ts + 1;
     for (tm->month = MDS_TIME_MONTH_DEC; tm->month >= MDS_TIME_MONTH_JAN; tm->month -= 1) {
         int16_t yday = G_YDAYS_OF_MONTH[tm->month - 1];
         if ((tm->month > MDS_TIME_MONTH_FEB) && TIME_IS_LEAPYEAR(tm->year)) {
             yday += 1;
         }
-        if (yday < tmp) {
-            tmp -= yday;
+        if (yday < tmp.ts) {
+            tmp.ts -= yday;
             break;
         }
     }
-    tm->mday = tmp;
+    tm->mday = tmp.ts;
 }
 
-MDS_Time_t MDS_TIME_DiffTimeMs(MDS_TimeDate_t *tm1, MDS_TimeDate_t *tm2)
+MDS_TimeStamp_t MDS_TIME_DiffTimeMs(MDS_TimeDate_t *tm1, MDS_TimeDate_t *tm2)
 {
-    MDS_Time_t ts1 = MDS_TIME_ChangeTimeStamp(tm1, 0);
-    MDS_Time_t ts2 = MDS_TIME_ChangeTimeStamp(tm2, 0);
+    MDS_TimeStamp_t ts1 = MDS_TIME_ChangeTimeStamp(tm1, 0);
+    MDS_TimeStamp_t ts2 = MDS_TIME_ChangeTimeStamp(tm2, 0);
 
-    return (ts1 - ts2);
+    return ((MDS_TimeStamp_t) {.ts = ts1.ts - ts2.ts});
 }

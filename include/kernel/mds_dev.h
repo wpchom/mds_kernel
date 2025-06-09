@@ -20,7 +20,13 @@ extern "C" {
 #endif
 
 /* Typedef ----------------------------------------------------------------- */
-typedef enum MDS_DeviceCmd {
+typedef struct MDS_DeviceCmd {
+    uint32_t cmd;
+} MDS_DeviceCmd_t;
+
+#define MDS_DEVICE_COMMAND(c) ((MDS_DeviceCmd_t) {.cmd = c})
+
+enum MDS_DEVICE_Cmd {
     MDS_DEVICE_CMD_INIT,
     MDS_DEVICE_CMD_DEINIT,
     MDS_DEVICE_CMD_HANDLESZ,
@@ -31,7 +37,7 @@ typedef enum MDS_DeviceCmd {
     MDS_DEVICE_CMD_DUMP,
 
     MDS_DEVICE_CMD_DRIVER,
-} MDS_DeviceCmd_t;
+};
 
 typedef struct MDS_Device MDS_Device_t;
 typedef struct MDS_DevModule MDS_DevModule_t;
@@ -42,7 +48,7 @@ typedef union MDS_DevHandle {
 } MDS_DevHandle_t;
 
 typedef struct MDS_DevDriver {
-    MDS_Err_t (*control)(const MDS_Device_t *device, MDS_Item_t cmd, MDS_Arg_t *arg);
+    MDS_Err_t (*control)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd, MDS_Arg_t *arg);
 } MDS_DevDriver_t;
 
 struct MDS_Device {

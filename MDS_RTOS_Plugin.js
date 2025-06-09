@@ -276,13 +276,13 @@ function UpdateSemaphoreAdd(SemaphoreNode) {
 
     var SemaphoreList = "";
     var ThreadList = Debug.evaluate("&(((MDS_Semaphore_t *)" + SemaphoreNode + ")->list)");
-    var ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadList + ")->next)"));
+    var ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadList + ")->next)"));
     while (ThreadNext != ThreadList) {
         if (SemaphoreList != "") {
             SemaphoreList += ",";
         }
         SemaphoreList += "0x" + ThreadNext.toString(16).toUpperCase();
-        ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadNext + ")->next)"));
+        ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadNext + ")->next)"));
     }
 
     Threads.add2(Semaphores, "0x" + SemaphoreNode.toString(16).toUpperCase(),
@@ -297,13 +297,13 @@ function UpdateMutexAdd(MutexNode) {
 
     var MutexList = "";
     var ThreadList = Debug.evaluate("&(((MDS_Mutex_t *)" + SemaphoreNode + ")->list)");
-    var ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadList + ")->next)"));
+    var ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadList + ")->next)"));
     while (ThreadNext != ThreadList) {
         if (MutexList != "") {
             MutexList += ",";
         }
         MutexList += "0x" + ThreadNext.toString(16).toUpperCase();
-        ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadNext + ")->next)"));
+        ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadNext + ")->next)"));
     }
 
     Threads.add2(Mutexes, "0x" + MutexNode.toString(16).toUpperCase(),
@@ -316,13 +316,13 @@ function UpdateEventAdd(EventNode) {
 
     var EventList = "";
     var ThreadList = Debug.evaluate("&(((MDS_Mutex_t *)" + EventNode + ")->list)");
-    var ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadList + ")->next)"));
+    var ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadList + ")->next)"));
     while (ThreadNext != ThreadList) {
         if (EventList != "") {
             EventList += ",";
         }
         EventList += "0x" + ThreadNext.toString(16).toUpperCase();
-        ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadNext + ")->next)"));
+        ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadNext + ")->next)"));
     }
 
     Threads.add2(Events, "0x" + EventNode.toString(16).toUpperCase(),
@@ -352,23 +352,23 @@ function UpdateMsgQueueAdd(MsgQueueNode) {
     var MemPoolSender = "";
 
     var ThreadList = Debug.evaluate("&(((MDS_MemPool_t *)" + MsgQueueNode + ")->listRecv)");
-    var ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadList + ")->next)"));
+    var ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadList + ")->next)"));
     while (ThreadNext != ThreadList) {
         if (MemPoolRecver != "") {
             MemPoolRecver += ",";
         }
         MemPoolRecver += "0x" + ThreadNext.toString(16).toUpperCase();
-        ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadNext + ")->next)"));
+        ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadNext + ")->next)"));
     }
 
     ThreadList = Debug.evaluate("&(((MDS_MemPool_t *)" + MsgQueueNode + ")->listSend)");
-    ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadList + ")->next)"));
+    ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadList + ")->next)"));
     while (ThreadNext != ThreadList) {
         if (MemPoolSender != "") {
             MemPoolSender += ",";
         }
         MemPoolSender += "0x" + ThreadNext.toString(16).toUpperCase();
-        ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadNext + ")->next)"));
+        ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadNext + ")->next)"));
     }
 
     Threads.add2(MsgQueues, "0x" + MsgQueueNode.toString(16).toUpperCase(),
@@ -392,13 +392,13 @@ function UpdateMemPoolAdd(MemPoolNode) {
 
     var MemPoolList = "";
     var ThreadList = Debug.evaluate("&(((MDS_MemPool_t *)" + MemPoolNode + ")->list)");
-    var ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadList + ")->next)"));
+    var ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadList + ")->next)"));
     while (ThreadNext != ThreadList) {
         if (MemPoolList != "") {
             MemPoolList += ",";
         }
         MemPoolList += "0x" + ThreadNext.toString(16).toUpperCase();
-        ThreadNext = Debug.evaluate(("(((MDS_ListNode_t *)" + ThreadNext + ")->next)"));
+        ThreadNext = Debug.evaluate(("(((MDS_DListNode_t *)" + ThreadNext + ")->next)"));
     }
 
     Threads.add2(MemPools, "0x" + MemPoolNode.toString(16).toUpperCase(),
@@ -421,11 +421,11 @@ function UpdateMemHeapAdd(MemHeapNode) {
 }
 
 function UpdateOjbects(obj, func) {
-    var ObjectList = Debug.evaluate("(MDS_ListNode_t*)(&g_objectList[" + obj + "])");
+    var ObjectList = Debug.evaluate("(MDS_DListNode_t*)(&g_objectList[" + obj + "])");
     var ObjectNode = ObjectList;
 
     while (true) {
-        ObjectNode = Debug.evaluate(("(((MDS_ListNode_t *)" + ObjectNode + ")->next)"));
+        ObjectNode = Debug.evaluate(("(((MDS_DListNode_t *)" + ObjectNode + ")->next)"));
         if (ObjectNode == ObjectList) {
             break;
         }

@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "mds_sys.h"
+#include "kernel/mds_sys.h"
 
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
@@ -102,7 +102,7 @@ static MDS_Err_t MDS_MemHeapLLFF_Setup(MDS_MemHeap_t *memheap, void *heapBase, s
                   (memheap, MDS_KERNEL_TRACE_MEMHEAP_INIT, (void *)alignBegin, (void *)alignLimit,
                    sizeof(MemHeapLLFF_Node_t)));
 
-    MDS_LOG_D("[memory]memheap(%p) init begin:%p limit:%p size:%u", memheap, (void *)alignBegin,
+    MDS_LOG_D("[memory] memheap(%p) init begin:%p limit:%p size:%zu", memheap, (void *)alignBegin,
               (void *)alignLimit, alignLimit - alignBegin);
 
     return (MDS_EOK);
@@ -131,7 +131,7 @@ static void MemHeapLLFF_NodeFree(MDS_MemHeap_t *memheap, MemHeapLLFF_Node_t *nod
                   (memheap, MDS_KERNEL_TRACE_MEMHEAP_FREE, NULL, node,
                    (uintptr_t)(node->next) - (uintptr_t)(node) - sizeof(MemHeapLLFF_Node_t)));
 
-    MDS_LOG_D("[memory]memheap(%p) free node:%p size:%u", memheap, node,
+    MDS_LOG_D("[memory] memheap(%p) free node:%p size:%zu", memheap, node,
               (uintptr_t)(node->next) - (uintptr_t)(node) - sizeof(MemHeapLLFF_Node_t));
 }
 
@@ -146,7 +146,7 @@ static void MDS_MemHeapLLFF_Free(MDS_MemHeap_t *memheap, void *ptr)
     if (MemHeapLLFF_IsPtrInside(memheap, ptr)) {
         MemHeapLLFF_NodeFree(memheap, node);
     } else {
-        MDS_LOG_W("[memory]memheap(%p) free ptr(%p) is not inside", memheap, ptr);
+        MDS_LOG_W("[memory] memheap(%p) free ptr(%p) is not inside", memheap, ptr);
     }
 }
 
@@ -183,13 +183,13 @@ static MemHeapLLFF_Node_t *MemHeapLLFF_NodeAlloc(MDS_MemHeap_t *memheap, size_t 
                       (memheap, MDS_KERNEL_TRACE_MEMHEAP_ALLOC,
                        (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), NULL, alignSize));
 
-        MDS_LOG_D("[memory]memheap(%p) first:%p alloc node:%p size:%u", memheap, limit->next, node,
-                  alignSize);
+        MDS_LOG_D("[memory] memheap(%p) first:%p alloc node:%p size:%zu", memheap, limit->next,
+                  node, alignSize);
 
         return (node);
     }
 
-    MDS_LOG_D("[memory]memheap(%p) first:%p alloc size:%u no memory", memheap, limit->next,
+    MDS_LOG_D("[memory] memheap(%p) first:%p alloc size:%zu no memory", memheap, limit->next,
               alignSize);
 
     return (NULL);
@@ -200,7 +200,7 @@ static void *MDS_MemHeapLLFF_Alloc(MDS_MemHeap_t *memheap, size_t size)
     size_t alignSize = VALUE_ALIGN(size + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
     size_t totalSize = MemHeapLLFF_Size(memheap);
     if ((alignSize == 0) || (alignSize > totalSize)) {
-        MDS_LOG_E("[memory]memheap(%p) alloc size:%u error of total:%u", memheap, alignSize,
+        MDS_LOG_E("[memory] memheap(%p) alloc size:%zu error of total:%zu", memheap, alignSize,
                   totalSize);
         return (NULL);
     }
@@ -242,7 +242,7 @@ static MemHeapLLFF_Node_t *MemHeapLLFF_NodeRealloc(MDS_MemHeap_t *memheap,
                            (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
                            (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), alignSize));
 
-            MDS_LOG_D("[memory]memheap(%p) realloc node:%p extend size:%u->%u", memheap, node,
+            MDS_LOG_D("[memory] memheap(%p) realloc node:%p extend size:%zu->%zu", memheap, node,
                       nodeSize, hopeSize);
         }
     } else {
@@ -251,7 +251,7 @@ static MemHeapLLFF_Node_t *MemHeapLLFF_NodeRealloc(MDS_MemHeap_t *memheap,
                        (uint8_t *)node + sizeof(MemHeapLLFF_Node_t),
                        (uint8_t *)node + sizeof(MemHeapLLFF_Node_t), alignSize));
 
-        MDS_LOG_D("[memory]memheap(%p) realloc node:%p reduce size:%u->%u", memheap, node,
+        MDS_LOG_D("[memory] memheap(%p) realloc node:%p reduce size:%zu->%zu", memheap, node,
                   nodeSize, hopeSize);
     }
 
@@ -283,7 +283,7 @@ static void *MDS_MemHeapLLFF_Realloc(MDS_MemHeap_t *memheap, void *ptr, size_t s
     size_t alignSize = VALUE_ALIGN(size + MDS_SYSMEM_ALIGN_SIZE - 1, MDS_SYSMEM_ALIGN_SIZE);
     size_t totalSize = MemHeapLLFF_Size(memheap);
     if ((!MemHeapLLFF_IsPtrInside(memheap, ptr)) || (alignSize > totalSize)) {
-        MDS_LOG_E("[memory]memheap(%p) realloc ptr(%p) size:%u error of total:%u", memheap, ptr,
+        MDS_LOG_E("[memory] memheap(%p) realloc ptr(%p) size:%zu error of total:%zu", memheap, ptr,
                   alignSize, totalSize);
         return (NULL);
     }

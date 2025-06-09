@@ -25,10 +25,6 @@ extern "C" {
 #define CONFIG_MDS_LOG_ENABLE 1
 #endif
 
-#ifndef CONFIG_MDS_LOG_FORMAT_SECTION
-#define CONFIG_MDS_LOG_FORMAT_SECTION ".logfmt."
-#endif
-
 #ifndef CONFIG_MDS_LOG_BUILD_LEVEL
 #define CONFIG_MDS_LOG_BUILD_LEVEL MDS_LOG_LEVEL_INF
 #endif
@@ -38,7 +34,11 @@ extern "C" {
 #endif
 
 #ifndef CONFIG_MDS_ASSERT_ENABLE
-#define CONFIG_MDS_ASSERT_ENABLE 0
+#define CONFIG_MDS_ASSERT_ENABLE 1
+#endif
+
+#ifndef CONFIG_MDS_LOG_FORMAT_SECTION
+#define CONFIG_MDS_LOG_FORMAT_SECTION ".logfmt."
 #endif
 
 /* Log --------------------------------------------------------------------- */
@@ -66,13 +66,14 @@ struct MDS_LOG_Module {
 };
 
 #define __LOG_FORMAT_SECTION_STR(_lvl)                                                            \
-    CONFIG_MDS_LOG_FORMAT_SECTION MDS_ARGUMENT_CAT(__LOG_FORMAT_SECTION_, _lvl)
-#define __LOG_FORMAT_SECTION_0 "off."
-#define __LOG_FORMAT_SECTION_1 "fatal."
-#define __LOG_FORMAT_SECTION_2 "error."
-#define __LOG_FORMAT_SECTION_3 "warn."
-#define __LOG_FORMAT_SECTION_4 "info."
-#define __LOG_FORMAT_SECTION_5 "debug."
+    CONFIG_MDS_LOG_FORMAT_SECTION MDS_ARGUMENT_CAT(__LOG_FORMAT_SECTION_, _lvl) "."
+#define __LOG_FORMAT_SECTION_0 "off"
+#define __LOG_FORMAT_SECTION_1 "fatal"
+#define __LOG_FORMAT_SECTION_2 "error"
+#define __LOG_FORMAT_SECTION_3 "warn"
+#define __LOG_FORMAT_SECTION_4 "info"
+#define __LOG_FORMAT_SECTION_5 "debug"
+#define __LOG_FORMAT_SECTION__ "panic"
 
 #define __LOG_MODULE_LEVEL(...) MDS_ARGUMENT_GET_N(1, ##__VA_ARGS__, CONFIG_MDS_LOG_BUILD_LEVEL)
 
@@ -84,7 +85,7 @@ struct MDS_LOG_Module {
     const MDS_LOG_Module_t *const __THIS_LOG_MODULE_HANDLE = &(G_MDS_LOG_MODULE_##_name)
 
 #if (defined(CONFIG_MDS_LOG_FILTER_ENABLE) && (CONFIG_MDS_LOG_FILTER_ENABLE != 0))
-#define MDS_LOG_MODULE_INIT(_name, ...)                                                           \
+#define MDS_LOG_MODULE_DEFINE(_name, ...)                                                         \
     static __attribute__((used))                                                                  \
     const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
     static MDS_LOG_Filter_t g_mds_log_filter_##_name = {                                          \
@@ -99,7 +100,7 @@ struct MDS_LOG_Module {
 #define MDS_LOG_MODULE_LEVEL(_lvl)       __THIS_LOG_MODULE_HANDLE->filter->level = _lvl
 #define MDS_LOG_MODULE_BACKEND(_backend) __THIS_LOG_MODULE_HANDLE->filter->backend = _backend
 #else
-#define MDS_LOG_MODULE_INIT(_name, ...)                                                           \
+#define MDS_LOG_MODULE_DEFINE(_name, ...)                                                         \
     static __attribute__((used))                                                                  \
     const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
     const MDS_LOG_Module_t G_MDS_LOG_MODULE_##_name = {.name = #_name};                           \
@@ -171,7 +172,7 @@ __attribute__((noreturn, format(printf, 2, 3))) void MDS_PanicPrintf(size_t va_s
 #define MDS_PANIC(_fmt, ...)                                                                      \
     do {                                                                                          \
         void *caller = __builtin_return_address(0);                                               \
-        static __attribute__((section(CONFIG_MDS_LOG_FORMAT_SECTION "panic.")))                   \
+        static __attribute__((section(__LOG_FORMAT_SECTION_STR(_))))                              \
         const char __logfmt[] = "[PANIC] caller:%p " _fmt "\n";                                   \
         MDS_PanicPrintf(sizeof(void *) + __LOG_ARGUMENT_SIZE(__VA_ARGS__), __logfmt, caller,      \
                         ##__VA_ARGS__);                                                           \
@@ -200,7 +201,7 @@ __attribute__((noreturn, format(printf, 2, 3))) void MDS_PanicPrintf(size_t va_s
     MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE, (extern const _TYPE G_MDS_HOOK_##_MODULE),  \
                     ())
 
-#define MDS_HOOK_INIT(_MODULE, _TYPE, ...)                                                        \
+#define MDS_HOOK_DEFINE(_MODULE, _TYPE, ...)                                                      \
     MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE,                                             \
                     (const _TYPE G_MDS_HOOK_##_MODULE = {__DEBRACKET __VA_ARGS__}), ())
 

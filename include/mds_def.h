@@ -28,17 +28,27 @@ extern "C" {
 #endif
 
 /* Typedef ----------------------------------------------------------------- */
-#if (defined(CONFIG_MDS_TICK_LLU) && (CONFIG_MDS_TICK_LLU))
+#if (defined(CONFIG_MDS_TICK_U64) && (CONFIG_MDS_TICK_U64))
 typedef uint64_t MDS_Tick_t;
-#define MDS_TICK_FMT "%llu"
 #else
 typedef uint32_t MDS_Tick_t;
-#define MDS_TICK_FMT "%lu"
 #endif
 
-typedef int64_t MDS_Time_t;
-typedef intptr_t MDS_Item_t;
-typedef uintptr_t MDS_Mask_t;
+typedef struct MDS_TimeStamp {
+    int64_t ts;
+} MDS_TimeStamp_t;
+
+typedef struct MDS_Lock {
+    intptr_t key;
+} MDS_Lock_t;
+
+typedef struct MDS_Mask {
+    uintptr_t mask;
+} MDS_Mask_t;
+
+typedef struct MDS_Timeout {
+    MDS_Tick_t ticks;
+} MDS_Timeout_t;
 
 typedef union MDS_Arg {
     void *arg;
@@ -100,17 +110,23 @@ typedef enum MDS_Err {
 #endif
 
 /* Linked List ------------------------------------------------------------- */
-typedef struct MDS_ListNode {
-    struct MDS_ListNode *prev, *next;
-} MDS_ListNode_t;
+typedef struct MDS_SListNode {
+    struct MDS_SListNode *next;
+} MDS_SListNode_t;
 
-static inline void MDS_ListInitNode(MDS_ListNode_t *node)
+typedef struct MDS_DListNode {
+    struct MDS_DListNode *prev, *next;
+} MDS_DListNode_t;
+
+#define MDS_DLIST_INIT(list) {.next = &(list), .prev = &(list)}
+
+static inline void MDS_DListInitNode(MDS_DListNode_t *node)
 {
     node->prev = node;
     node->next = node;
 }
 
-static inline void MDS_ListInsertNodeNext(MDS_ListNode_t *list, MDS_ListNode_t *node)
+static inline void MDS_DListInsertNodeNext(MDS_DListNode_t *list, MDS_DListNode_t *node)
 {
     node->prev = list;
     node->next = list->next;
@@ -118,7 +134,7 @@ static inline void MDS_ListInsertNodeNext(MDS_ListNode_t *list, MDS_ListNode_t *
     list->next = node;
 }
 
-static inline void MDS_ListInsertNodePrev(MDS_ListNode_t *list, MDS_ListNode_t *node)
+static inline void MDS_DListInsertNodePrev(MDS_DListNode_t *list, MDS_DListNode_t *node)
 {
     node->prev = list->prev;
     node->next = list;
@@ -126,7 +142,7 @@ static inline void MDS_ListInsertNodePrev(MDS_ListNode_t *list, MDS_ListNode_t *
     list->prev = node;
 }
 
-static inline void MDS_ListRemoveNode(MDS_ListNode_t *node)
+static inline void MDS_DListRemoveNode(MDS_DListNode_t *node)
 {
     node->prev->next = node->next;
     node->next->prev = node->prev;
@@ -134,27 +150,27 @@ static inline void MDS_ListRemoveNode(MDS_ListNode_t *node)
     node->next = node;
 }
 
-static inline bool MDS_ListIsEmpty(const MDS_ListNode_t *node)
+static inline bool MDS_DListIsEmpty(const MDS_DListNode_t *node)
 {
     return (node->prev == node);
 }
 
-static inline size_t MDS_ListGetCount(const MDS_ListNode_t *list)
+static inline size_t MDS_DListGetCount(const MDS_DListNode_t *list)
 {
     size_t cnt = 0;
 
-    for (MDS_ListNode_t *node = list->next; node != list; node = node->next) {
+    for (MDS_DListNode_t *node = list->next; node != list; node = node->next) {
         cnt += 1;
     }
 
     return (cnt);
 }
 
-static inline MDS_ListNode_t *MDS_ListForeachNext(const MDS_ListNode_t *list,
-                                                  int (*cmp)(const MDS_ListNode_t *, void *),
-                                                  void *arg)
+static inline MDS_DListNode_t *MDS_DListForeachNext(const MDS_DListNode_t *list,
+                                                    int (*cmp)(const MDS_DListNode_t *, void *),
+                                                    void *arg)
 {
-    for (MDS_ListNode_t *node = list->next, *next = node->next; (node != list) && (node != NULL);
+    for (MDS_DListNode_t *node = list->next, *next = node->next; (node != list) && (node != NULL);
          node = next, next = node->next) {
         if (cmp(node, arg) == 0) {
             return (node);
@@ -164,11 +180,11 @@ static inline MDS_ListNode_t *MDS_ListForeachNext(const MDS_ListNode_t *list,
     return (NULL);
 }
 
-static inline MDS_ListNode_t *MDS_ListForeachPrev(const MDS_ListNode_t *list,
-                                                  int (*cmp)(const MDS_ListNode_t *, void *),
-                                                  void *arg)
+static inline MDS_DListNode_t *MDS_DListForeachPrev(const MDS_DListNode_t *list,
+                                                    int (*cmp)(const MDS_DListNode_t *, void *),
+                                                    void *arg)
 {
-    for (MDS_ListNode_t *node = list->prev, *prev = node->prev; (node != list) && (node != NULL);
+    for (MDS_DListNode_t *node = list->prev, *prev = node->prev; (node != list) && (node != NULL);
          node = prev, prev = node->prev) {
         if (cmp(node, arg) == 0) {
             return (node);
@@ -189,20 +205,20 @@ static inline MDS_ListNode_t *MDS_ListForeachPrev(const MDS_ListNode_t *list,
          (iter) = CONTAINER_OF((iter)->member.prev, __typeof__(*(iter)), member))
 
 /* Skip List --------------------------------------------------------------- */
-void MDS_SkipListInitNode(MDS_ListNode_t node[], size_t size);
-void MDS_SkipListRemoveNode(MDS_ListNode_t node[], size_t size);
-bool MDS_SkipListIsEmpty(MDS_ListNode_t node[], size_t size);
-MDS_ListNode_t *MDS_SkipListSearchNode(
-    MDS_ListNode_t *last[], MDS_ListNode_t list[], size_t size, const void *value,
-    int (*compare)(const MDS_ListNode_t *node, const void *value));
-size_t MDS_SkipListInsertNode(MDS_ListNode_t *last[], MDS_ListNode_t node[], size_t size,
+void MDS_SkipListInitNode(MDS_DListNode_t node[], size_t size);
+void MDS_SkipListRemoveNode(MDS_DListNode_t node[], size_t size);
+bool MDS_SkipListIsEmpty(MDS_DListNode_t node[], size_t size);
+MDS_DListNode_t *MDS_SkipListSearchNode(
+    MDS_DListNode_t *last[], MDS_DListNode_t list[], size_t size, const void *value,
+    int (*compare)(const MDS_DListNode_t *node, const void *value));
+size_t MDS_SkipListInsertNode(MDS_DListNode_t *last[], MDS_DListNode_t node[], size_t size,
                               size_t rand, size_t shift);
 
 /* Tree -------------------------------------------------------------------- */
 typedef struct MDS_TreeNode {
     struct MDS_TreeNode *parent;
-    MDS_ListNode_t child;
-    MDS_ListNode_t sibling;
+    MDS_DListNode_t child;
+    MDS_DListNode_t sibling;
 } MDS_TreeNode_t;
 
 void MDS_TreeInitNode(MDS_TreeNode_t *node);
@@ -305,9 +321,9 @@ typedef enum MDS_TIME_Month {
     MDS_TIME_MONTH_DEC,
 } MDS_TIME_Month_t;
 
-MDS_Time_t MDS_TIME_ChangeTimeStamp(MDS_TimeDate_t *tm, int8_t tz);
-void MDS_TIME_ChangeTimeDate(MDS_TimeDate_t *tm, MDS_Time_t timestamp, int8_t tz);
-MDS_Time_t MDS_TIME_DiffTimeMs(MDS_TimeDate_t *tm1, MDS_TimeDate_t *tm2);
+MDS_TimeStamp_t MDS_TIME_ChangeTimeStamp(MDS_TimeDate_t *tm, int8_t tz);
+void MDS_TIME_ChangeTimeDate(MDS_TimeDate_t *tm, MDS_TimeStamp_t timestamp, int8_t tz);
+MDS_TimeStamp_t MDS_TIME_DiffTimeMs(MDS_TimeDate_t *tm1, MDS_TimeDate_t *tm2);
 
 #ifdef __cplusplus
 }

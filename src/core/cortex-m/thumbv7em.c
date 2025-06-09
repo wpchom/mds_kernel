@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "mds_sys.h"
+#include "kernel/mds_sys.h"
 
 /* Define ----------------------------------------------------------------- */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
@@ -162,7 +162,7 @@ inline void MDS_CoreIdleSleep(void)
 }
 
 /* CoreInterrupt ----------------------------------------------------------- */
-inline MDS_Item_t MDS_CoreInterruptCurrent(void)
+inline intptr_t MDS_CoreInterruptCurrent(void)
 {
     register intptr_t result;
 
@@ -171,19 +171,21 @@ inline MDS_Item_t MDS_CoreInterruptCurrent(void)
     return (result & 0x1FF);
 }
 
-inline MDS_Item_t MDS_CoreInterruptLock(void)
+inline MDS_Lock_t MDS_CoreInterruptLock(void)
 {
     register intptr_t result;
 
     __asm volatile("mrs         %0, primask" : "=r"(result));
     __asm volatile("cpsid       i" : : : "memory");
+    __asm volatile("isb" : : : "memory");
 
-    return (result);
+    return ((MDS_Lock_t) {.key = result});
 }
 
-inline void MDS_CoreInterruptRestore(MDS_Item_t lock)
+inline void MDS_CoreInterruptRestore(MDS_Lock_t lock)
 {
-    __asm volatile("msr         primask, %0" : : "r"(lock) : "memory");
+    __asm volatile("msr         primask, %0" : : "r"(lock.key) : "memory");
+    __asm volatile("isb" : : : "memory");
 }
 
 /* CoreThread -------------------------------------------------------------- */
@@ -392,7 +394,7 @@ static void CORE_StackBacktrace(uintptr_t stackPoint, uintptr_t stackLimit, size
          stackPoint += sizeof(uintptr_t)) {
         uintptr_t pc = *((uintptr_t *)stackPoint) - sizeof(uintptr_t) - 1;
         if (MDS_CoreStackPointerInCode(pc) && CORE_DisassemblyInsIsBL(pc)) {
-            MDS_LOG_F("[BACKTRACE] %d: %p", dp, (void *)pc);
+            MDS_LOG_F("[BACKTRACE] %zu: %p", dp, (void *)pc);
             dp += 1;
         }
     }
@@ -418,8 +420,8 @@ static void CORE_ExceptionBacktrace(void)
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
     if (thread != NULL) {
         uintptr_t psp = CORE_GetPSP();
-        MDS_LOG_F("current thread(%p) entry:%p psp:%p stackbase:%p stacksize:%u backtrace", thread,
-                  thread->entry, (void *)psp, thread->stackBase, thread->stackSize);
+        MDS_LOG_F("current thread(%p) entry:%p psp:%p stackbase:%p stacksize:%zu backtrace",
+                  thread, thread->entry, (void *)psp, thread->stackBase, thread->stackSize);
         CORE_StackBacktrace(psp, (uintptr_t)(thread->stackBase) + thread->stackSize,
                             CONFIG_MDS_CORE_BACKTRACE_DEPTH);
     }
@@ -442,19 +444,22 @@ static __attribute__((noreturn)) void MDS_CoreHardFaultException(struct Exceptio
     if (g_exceptionContext == NULL) {
         g_exceptionContext = &(excInfo->stack);
 
-        MDS_LOG_F("[HARDFAULT] on ipsr:%u exc_return:%lx", MDS_CoreInterruptCurrent(),
+        MDS_LOG_F("[HARDFAULT] on ipsr:%zx exc_return:%lx", MDS_CoreInterruptCurrent(),
                   excInfo->exc_return);
-        // MDS_LOG_F("r0 :%p r1 :%p r2 :%p r3 :%p ", g_exceptionContext->exception.r0,
-        //           g_exceptionContext->exception.r1, g_exceptionContext->exception.r2,
-        //           g_exceptionContext->exception.r3);
-        // MDS_LOG_F("r4 :%p r5 :%p r6 :%p r7 :%p ", g_exceptionContext->r4,
-        //           g_exceptionContext->r5, g_exceptionContext->r6, g_exceptionContext->r7);
-        // MDS_LOG_F("r8 :%p r9 :%p r10:%p r11:%p ", g_exceptionContext->r8,
-        //           g_exceptionContext->r9, g_exceptionContext->r10,
-        //           g_exceptionContext->r11);
-        // MDS_LOG_F("r12:%p lr :%p pc :%p psr:%p ", g_exceptionContext->exception.r12,
-        //           g_exceptionContext->exception.lr, g_exceptionContext->exception.pc,
-        //           g_exceptionContext->exception.psr);
+        MDS_LOG_F("r0 :%p r1 :%p r2 :%p r3 :%p ", (void *)(g_exceptionContext->exception.r0),
+                  (void *)(g_exceptionContext->exception.r1),
+                  (void *)(g_exceptionContext->exception.r2),
+                  (void *)(g_exceptionContext->exception.r3));
+        MDS_LOG_F("r4 :%p r5 :%p r6 :%p r7 :%p ", (void *)(g_exceptionContext->r4),
+                  (void *)(g_exceptionContext->r5), (void *)(g_exceptionContext->r6),
+                  (void *)(g_exceptionContext->r7));
+        MDS_LOG_F("r8 :%p r9 :%p r10:%p r11:%p ", (void *)(g_exceptionContext->r8),
+                  (void *)(g_exceptionContext->r9), (void *)(g_exceptionContext->r10),
+                  (void *)(g_exceptionContext->r11));
+        MDS_LOG_F("r12:%p lr :%p pc :%p psr:%p ", (void *)(g_exceptionContext->exception.r12),
+                  (void *)(g_exceptionContext->exception.lr),
+                  (void *)(g_exceptionContext->exception.pc),
+                  (void *)(g_exceptionContext->exception.psr));
 
         CORE_ExceptionBacktrace();
     }

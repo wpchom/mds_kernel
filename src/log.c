@@ -10,10 +10,10 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "mds_sys.h"
+#include "kernel/mds_sys.h"
 
 /* Define ------------------------------------------------------------------ */
-MDS_LOG_MODULE_INIT(kernel, CONFIG_MDS_LOG_BUILD_LEVEL);
+MDS_LOG_MODULE_DEFINE(kernel, CONFIG_MDS_LOG_BUILD_LEVEL);
 
 /* Variable ---------------------------------------------------------------- */
 static MDS_LOG_VaPrint_t g_logVaPrintFunc = NULL;
@@ -24,8 +24,8 @@ void MDS_LOG_RegisterVaPrint(MDS_LOG_VaPrint_t logVaPrint)
     g_logVaPrintFunc = logVaPrint;
 }
 
-static void MDS_LOG_ModuleVaPrintf(const MDS_LOG_Module_t *module, uint8_t level,
-                                   size_t va_size, const char *fmt, va_list va_args)
+static void MDS_LOG_ModuleVaPrintf(const MDS_LOG_Module_t *module, uint8_t level, size_t va_size,
+                                   const char *fmt, va_list va_args)
 {
 #if (defined(CONFIG_MDS_LOG_FILTER_ENABLE) && (CONFIG_MDS_LOG_FILTER_ENABLE != 0))
     if ((module != NULL) && (module->filter != NULL)) {
@@ -53,8 +53,10 @@ void MDS_LOG_ModulePrintf(const MDS_LOG_Module_t *module, uint8_t level, size_t 
     va_end(va_args);
 }
 
-__attribute__((weak)) void MDS_CorePanicTrace(void)
+__attribute__((weak, noreturn)) void MDS_CorePanicTrace(void)
 {
+    for (;;) {
+    }
 }
 
 __attribute__((noreturn)) void MDS_PanicPrintf(size_t va_size, const char *fmt, ...)
@@ -63,8 +65,7 @@ __attribute__((noreturn)) void MDS_PanicPrintf(size_t va_size, const char *fmt, 
     va_list va_args;
 
     va_start(va_args, fmt);
-    MDS_LOG_ModuleVaPrintf(__THIS_LOG_MODULE_HANDLE, MDS_LOG_LEVEL_FAT, va_size, fmt,
-                           va_args);
+    MDS_LOG_ModuleVaPrintf(__THIS_LOG_MODULE_HANDLE, MDS_LOG_LEVEL_FAT, va_size, fmt, va_args);
     va_end(va_args);
 #else
     UNUSED(va_size);
@@ -72,13 +73,9 @@ __attribute__((noreturn)) void MDS_PanicPrintf(size_t va_size, const char *fmt, 
 #endif
 
     MDS_CorePanicTrace();
-
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-    for (;;) {
-        UNUSED(lock);
-    }
 }
 
+#if 0
 /* Compress ---------------------------------------------------------------- */
 #ifndef MDS_LOG_COMPRESS_ARGS_NUMS
 #define MDS_LOG_COMPRESS_ARGS_NUMS 7
@@ -102,9 +99,10 @@ size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, size_t cn
         return (0);
     }
 
-    MDS_Item_t lock = MDS_CoreInterruptLock();
+    // atomic
+    MDS_Lock_t lock = MDS_KernelEnterCritical();
     logCompressPsn++;
-    MDS_CoreInterruptRestore(lock);
+    MDS_KernelExitCritical(lock);
 
     if (cnt > MDS_LOG_COMPRESS_ARGS_NUMS) {
         cnt = MDS_LOG_COMPRESS_ARGS_NUMS;
@@ -137,3 +135,4 @@ size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, size_t
 
     return (len);
 }
+#endif

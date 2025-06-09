@@ -329,18 +329,18 @@ inline intptr_t MDS_CoreInterruptCurrent(void)
     return (mcause);
 }
 
-inline MDS_Item_t MDS_CoreInterruptLock(void)
+inline MDS_Lock_t MDS_CoreInterruptLock(void)
 {
-    register intptr_t result;
+    register MDS_Lock_t result;
 
-    __asm volatile("csrrci      %0, mstatus, %1" : "=r"(result) : "i"(MSTATUS_MIE));
+    __asm volatile("csrrci      %0, mstatus, %1" : "=r"(result.key) : "i"(MSTATUS_MIE));
 
     return (result);
 }
 
-inline void MDS_CoreInterruptRestore(MDS_Item_t lock)
+inline void MDS_CoreInterruptRestore(MDS_Lock_t lock)
 {
-    __asm volatile("csrw        mstatus, %0" : : "r"(lock) : "memory");
+    __asm volatile("csrw        mstatus, %0" : : "r"(lock.key) : "memory");
 }
 
 inline void MDS_CoreIdleSleep(void)
