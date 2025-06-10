@@ -148,7 +148,15 @@ static_library("mds_kernel") {
   ]
 
   # lib
-  sources += [ "src/lib/library.c" ]
+  sources += [
+    "src/lib/format.c",
+    "src/lib/membuff.c",
+    "src/lib/msglist.c",
+    "src/lib/skiplist.c",
+    "src/lib/string.c",
+    "src/lib/time.c",
+    "src/lib/tree.c",
+  ]
   if (defined(mds_library_miniable) && mds_library_miniable) {
     defines += [ "CONFIG_MDS_LIBRARY_MINIABLE=1" ]
   } else {
