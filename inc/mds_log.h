@@ -33,8 +33,8 @@ extern "C" {
 #define CONFIG_MDS_LOG_FILTER_ENABLE 0
 #endif
 
-#ifndef CONFIG_MDS_ASSERT_ENABLE
-#define CONFIG_MDS_ASSERT_ENABLE 1
+#ifndef CONFIG_MDS_LOG_ASSERT_ENABLE
+#define CONFIG_MDS_LOG_ASSERT_ENABLE 1
 #endif
 
 #ifndef CONFIG_MDS_LOG_FORMAT_SECTION
@@ -185,7 +185,7 @@ __attribute__((noreturn, format(printf, 2, 3))) void MDS_PanicPrintf(size_t va_s
 #endif
 
 /* Assert ------------------------------------------------------------------ */
-#if (defined(CONFIG_MDS_ASSERT_ENABLE) && (CONFIG_MDS_ASSERT_ENABLE != 0))
+#if (defined(CONFIG_MDS_LOG_ASSERT_ENABLE) && (CONFIG_MDS_LOG_ASSERT_ENABLE != 0))
 #define MDS_ASSERT(condition)                                                                     \
     do {                                                                                          \
         if (!(condition)) {                                                                       \

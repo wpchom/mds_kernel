@@ -184,7 +184,7 @@ MDS_Thread_t *MDS_ThreadCreate(const char *name, MDS_ThreadEntry_t entry, MDS_Ar
     }
 
     MDS_LOG_D("[thread] entry:%p stack size:%zu priority:%d ticks:%lu create failed", entry,
-              stackSize, priority.priority, (uint32_t)ticks);
+              stackSize, priority.priority, (unsigned long)timeout.ticks);
 
     return (NULL);
 }

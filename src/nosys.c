@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "kernel/mds_sys.h"
+#include "mds_sys.h"
 
 /* Semaphore --------------------------------------------------------------- */
 MDS_Err_t MDS_SemaphoreInit(MDS_Semaphore_t *semaphore, const char *name, size_t init, size_t max)

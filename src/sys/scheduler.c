@@ -16,7 +16,7 @@
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 /* MLFQ Scheduler ---------------------------------------------------------- */
-#if (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX > 32)
+#if ((CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX <= 0) || (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX > 32))
 #error "kernel mlfq scheduler supported max priority 32-bit / 64-bit"
 #endif
 

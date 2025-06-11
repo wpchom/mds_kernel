@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "kernel.h"
+#include "../kernel.h"
 
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
@@ -140,7 +140,8 @@ void *MDS_MemPoolAlloc(MDS_MemPool_t *memPool, MDS_Timeout_t timeout)
             } else {
                 MDS_LOG_D(
                     "[mempool] mempool(%p) alloc blocksize:%zu suspend thread(%p) entry:%p timer wait:%lu",
-                    memPool, memPool->blkSize, thread, thread->entry, (uint32_t)timeout.ticks);
+                    memPool, memPool->blkSize, thread, thread->entry,
+                    (unsigned long)timeout.ticks);
             }
         }
 

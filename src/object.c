@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "kernel/mds_sys.h"
+#include "mds_sys.h"
 
 /* Define ------------------------------------------------------------------ */
 #define OBJECT_LIST_INIT(obj) [obj] = {.list = MDS_DLIST_INIT(g_objectList[obj].list)}

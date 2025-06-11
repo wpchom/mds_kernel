@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "kernel/mds_sys.h"
+#include "mds_sys.h"
 
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DEFINE(kernel, CONFIG_MDS_LOG_BUILD_LEVEL);

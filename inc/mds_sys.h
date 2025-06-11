@@ -77,8 +77,8 @@ typedef void (*MDS_InitEntry_t)(void);
 
 static inline void MDS_InitExport(void)
 {
-    static __attribute__((section(CONFIG_MDS_INIT_SECTION "\000"))) const void *initBegin = NULL;
-    static __attribute__((section(CONFIG_MDS_INIT_SECTION "\177"))) const void *initLimit = NULL;
+    static __attribute__((section(CONFIG_MDS_INIT_SECTION " "))) const void *initBegin = NULL;
+    static __attribute__((section(CONFIG_MDS_INIT_SECTION "~"))) const void *initLimit = NULL;
 
     for (const MDS_InitEntry_t *init =
              (MDS_InitEntry_t *)((uintptr_t)(&initBegin) + sizeof(void *));

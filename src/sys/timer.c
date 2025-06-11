@@ -16,16 +16,16 @@
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 #if (defined(CONFIG_MDS_TIMER_INDEPENDENT) && (CONFIG_MDS_TIMER_INDEPENDENT != 0))
-#ifndef MDS_TIMER_THREAD_PRIORITY
-#define MDS_TIMER_THREAD_PRIORITY 0
+#ifndef CONFIG_MDS_TIMER_THREAD_PRIORITY
+#define CONFIG_MDS_TIMER_THREAD_PRIORITY 0
 #endif
 
-#ifndef MDS_TIMER_THREAD_STACKSIZE
-#define MDS_TIMER_THREAD_STACKSIZE 256
+#ifndef CONFIG_MDS_TIMER_THREAD_STACKSIZE
+#define CONFIG_MDS_TIMER_THREAD_STACKSIZE 256
 #endif
 
-#ifndef MDS_TIMER_THREAD_TICKS
-#define MDS_TIMER_THREAD_TICKS 16
+#ifndef CONFIG_MDS_TIMER_THREAD_TICKS
+#define CONFIG_MDS_TIMER_THREAD_TICKS 16
 #endif
 #endif
 
@@ -34,7 +34,7 @@ static MDS_WorkQueue_t g_sysTimerQueue;
 #if (defined(CONFIG_MDS_TIMER_INDEPENDENT) && (CONFIG_MDS_TIMER_INDEPENDENT != 0))
 static MDS_WorkQueue_t g_sysWorkQueue;
 static MDS_Thread_t g_sysWorkqThread;
-static uint8_t g_sysWorkqStack[MDS_TIMER_THREAD_STACKSIZE];
+static uint8_t g_sysWorkqStack[CONFIG_MDS_TIMER_THREAD_STACKSIZE];
 #endif
 
 /* Function ---------------------------------------------------------------- */

@@ -175,7 +175,7 @@ static void WorkQueueThreadEntry(MDS_Arg_t *arg)
             MDS_WorkNode_t *workn = WORKQ_SkipListPeek(workq);
             nextTick = (workn != NULL) ? (workn->tickout) : (MDS_CLOCK_TICK_FOREVER);
 
-            MDS_LOG_D("[workq] thread take next tick check:%lu", (uint32_t)(nextTick));
+            MDS_LOG_D("[workq] thread take next tick check:%lu", (unsigned long)(nextTick));
 
             if (nextTick == MDS_CLOCK_TICK_FOREVER) {
                 MDS_ThreadSuspend(workq->thread);

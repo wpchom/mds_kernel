@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  **/
 /* Include ----------------------------------------------------------------- */
-#include "kernel.h"
+#include "../kernel.h"
 
 /* Define ------------------------------------------------------------------ */
 MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
@@ -149,7 +149,7 @@ MDS_Err_t MDS_MsgQueueRecvAcquire(MDS_MsgQueue_t *msgQueue, void *recv, MDS_Time
             } else {
                 MDS_LOG_D(
                     "[msgqueue] msgqueue(%p) recv suspend thread(%p) entry:%p timer wait:%lu",
-                    msgQueue, thread, thread->entry, (uint32_t)timeout.ticks);
+                    msgQueue, thread, thread->entry, (unsigned long)timeout.ticks);
             }
         }
 
@@ -283,7 +283,7 @@ MDS_Err_t MDS_MsgQueueSendMsg(MDS_MsgQueue_t *msgQueue, const MDS_MsgList_t *msg
             } else {
                 MDS_LOG_D(
                     "[msgqueue] msgqueue(%p) send suspend thread(%p) entry:%p timer wait:%lu",
-                    msgQueue, thread, thread->entry, (uint32_t)timeout.ticks);
+                    msgQueue, thread, thread->entry, (unsigned long)timeout.ticks);
             }
         }
 
