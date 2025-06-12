@@ -61,8 +61,6 @@ static_library("mds_kernel") {
     "src/sys/ipc/semaphore.c",
   ]
 
-  include_dirs = [ "src/sys" ]
-
   # mem
   sources += [
     "src/mem/llff.c",

@@ -1,0 +1,6 @@
+# xmake
+.xmake/
+build/
+
+# macOS
+.DS_Store
