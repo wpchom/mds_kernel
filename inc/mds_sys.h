@@ -53,6 +53,10 @@ extern "C" {
 #define CONFIG_MDS_TIMER_SKIPLIST_SHIFT 2
 #endif
 
+#ifndef CONFIG_MDS_KERNEL_STATS_ENABLE
+#define CONFIG_MDS_KERNEL_STATS_ENABLE 0
+#endif
+
 #ifndef CONFIG_MDS_INIT_SECTION
 #define CONFIG_MDS_INIT_SECTION ".init.mdsInit."
 #endif
