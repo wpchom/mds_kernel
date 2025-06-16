@@ -13,162 +13,221 @@
 #define __MDS_LOG_H__
 
 /* Include ----------------------------------------------------------------- */
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdint.h>
-
-#ifdef MDS_CONFIG_FILE
-#include MDS_CONFIG_FILE
-#endif
+#include "mds_def.h"
+#include "mds_utils.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Define ------------------------------------------------------------------ */
-#ifndef MDS_LOG_SECTION
-#define MDS_LOG_SECTION ".logstr."
+/* Config ------------------------------------------------------------------ */
+#ifndef CONFIG_MDS_LOG_ENABLE
+#define CONFIG_MDS_LOG_ENABLE 1
 #endif
 
-#ifndef MDS_LOG_BUILD_LEVEL
-#define MDS_LOG_BUILD_LEVEL MDS_LOG_LEVEL_INFO
+#ifndef CONFIG_MDS_LOG_BUILD_LEVEL
+#define CONFIG_MDS_LOG_BUILD_LEVEL MDS_LOG_LEVEL_INF
 #endif
 
-#ifndef MDS_LOG_TAG
-#define MDS_LOG_TAG ""
+#ifndef CONFIG_MDS_LOG_FILTER_ENABLE
+#define CONFIG_MDS_LOG_FILTER_ENABLE 0
 #endif
 
-#define MDS_LOG_LEVEL_OFF 0x00U
-#define MDS_LOG_LEVEL_TRACK 0x01U
-#define MDS_LOG_LEVEL_FATAL 0x02U
-#define MDS_LOG_LEVEL_ERROR 0x03U
-#define MDS_LOG_LEVEL_WARN 0x04U
-#define MDS_LOG_LEVEL_INFO 0x05U
-#define MDS_LOG_LEVEL_DEBUG 0x06U
-#define MDS_LOG_LEVEL_TRACE 0x07U
-
-#define MDS_LOG_ARG_SEQS(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, N, ...) N
-#define MDS_LOG_ARG_NUMS(...) \
-    MDS_LOG_ARG_SEQS(0, ##__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
-
-/* Compress ---------------------------------------------------------------- */
-#ifndef MDS_LOG_COMPRESS_ARGS_NUMS
-#define MDS_LOG_COMPRESS_ARGS_NUMS 7
+#ifndef CONFIG_MDS_LOG_ASSERT_ENABLE
+#define CONFIG_MDS_LOG_ASSERT_ENABLE 1
 #endif
 
-typedef struct MDS_LOG_Compress {
-    uint8_t magic;
-    uint32_t address : 24; // 0xFFxxxxxx
-    uint32_t level : 4;
-    uint32_t count : 4;
-    uint32_t psn : 12;
-    uint64_t timestamp : 44; // ms
-    uint32_t args[MDS_LOG_COMPRESS_ARGS_NUMS];
-} MDS_LOG_Compress_t;
+#ifndef CONFIG_MDS_LOG_FORMAT_SECTION
+#define CONFIG_MDS_LOG_FORMAT_SECTION ".logfmt."
+#endif
 
-extern size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t* log, size_t level, const char* fmt, size_t cnt, va_list ap);
-extern size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t* log, size_t level, const char* fmt, size_t cnt, ...);
+/* Log --------------------------------------------------------------------- */
+#define MDS_LOG_LEVEL_OFF 0
+#define MDS_LOG_LEVEL_FAT 1
+#define MDS_LOG_LEVEL_ERR 2
+#define MDS_LOG_LEVEL_WRN 3
+#define MDS_LOG_LEVEL_INF 4
+#define MDS_LOG_LEVEL_DBG 5
 
-/* Log ---------------------------------------------------------------------- */
-extern size_t MDS_LOG_GetPrintLevel(void);
-extern void MDS_LOG_SetPrintLevel(size_t level);
-extern void MDS_LOG_Register(void (*logVaPrintf)(size_t level, const void* fmt, size_t cnt, va_list ap));
-extern void MDS_LOG_VaPrintf(size_t level, const void* fmt, size_t cnt, va_list ap);
-extern void MDS_LOG_Printf(size_t level, const void* fmt, size_t cnt, ...);
+typedef struct MDS_LOG_Module MDS_LOG_Module_t;
+typedef void (*MDS_LOG_VaPrint_t)(const MDS_LOG_Module_t *module, uint8_t level, size_t va_size,
+                                  const char *fmt, va_list va_args);
 
-#if (MDS_LOG_BUILD_LEVEL >= MDS_LOG_LEVEL_TRACK)
-#define MDS_LOG_K(fmt, ...)                                                                                  \
-    do {                                                                                                     \
-        static const __attribute__((section(MDS_LOG_SECTION "track"))) char fmtstr[] = MDS_LOG_TAG fmt "\n"; \
-        MDS_LOG_Printf(MDS_LOG_LEVEL_TRACK, fmtstr, MDS_LOG_ARG_NUMS(__VA_ARGS__), ##__VA_ARGS__);           \
+typedef struct MDS_LOG_Filter {
+    MDS_LOG_VaPrint_t backend;
+    uint8_t level;  // align ?
+} MDS_LOG_Filter_t;
+
+struct MDS_LOG_Module {
+    const char *name;
+#if (defined(CONFIG_MDS_LOG_FILTER_ENABLE) && (CONFIG_MDS_LOG_FILTER_ENABLE != 0))
+    MDS_LOG_Filter_t *filter;
+#endif
+};
+
+#define __LOG_FORMAT_SECTION_STR(_lvl)                                                            \
+    CONFIG_MDS_LOG_FORMAT_SECTION MDS_ARGUMENT_CAT(__LOG_FORMAT_SECTION_, _lvl) "."
+#define __LOG_FORMAT_SECTION_0 "off"
+#define __LOG_FORMAT_SECTION_1 "fatal"
+#define __LOG_FORMAT_SECTION_2 "error"
+#define __LOG_FORMAT_SECTION_3 "warn"
+#define __LOG_FORMAT_SECTION_4 "info"
+#define __LOG_FORMAT_SECTION_5 "debug"
+#define __LOG_FORMAT_SECTION__ "panic"
+
+#define __LOG_MODULE_LEVEL(...) MDS_ARGUMENT_GET_N(1, ##__VA_ARGS__, CONFIG_MDS_LOG_BUILD_LEVEL)
+
+#define MDS_LOG_MODULE_DECLARE(_name, ...)                                                        \
+    static __attribute__((used))                                                                  \
+    const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
+    extern const MDS_LOG_Module_t G_MDS_LOG_MODULE_##_name;                                       \
+    static __attribute__((used))                                                                  \
+    const MDS_LOG_Module_t *const __THIS_LOG_MODULE_HANDLE = &(G_MDS_LOG_MODULE_##_name)
+
+#if (defined(CONFIG_MDS_LOG_FILTER_ENABLE) && (CONFIG_MDS_LOG_FILTER_ENABLE != 0))
+#define MDS_LOG_MODULE_DEFINE(_name, ...)                                                         \
+    static __attribute__((used))                                                                  \
+    const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
+    static MDS_LOG_Filter_t g_mds_log_filter_##_name = {                                          \
+        .level = __LOG_MODULE_LEVEL(__VA_ARGS__),                                                 \
+        .backend = NULL,                                                                          \
+    };                                                                                            \
+    const MDS_LOG_Module_t G_MDS_LOG_MODULE_##_name = {                                           \
+        .name = #_name, .filter = &(g_mds_log_filter_##_name)};                                   \
+    static __attribute__((used))                                                                  \
+    const MDS_LOG_Module_t *const __THIS_LOG_MODULE_HANDLE = &(G_MDS_LOG_MODULE_##_name)
+
+#define MDS_LOG_MODULE_LEVEL(_lvl)       __THIS_LOG_MODULE_HANDLE->filter->level = _lvl
+#define MDS_LOG_MODULE_BACKEND(_backend) __THIS_LOG_MODULE_HANDLE->filter->backend = _backend
+#else
+#define MDS_LOG_MODULE_DEFINE(_name, ...)                                                         \
+    static __attribute__((used))                                                                  \
+    const uint8_t __THIS_LOG_MODULE_LEVEL = __LOG_MODULE_LEVEL(__VA_ARGS__);                      \
+    const MDS_LOG_Module_t G_MDS_LOG_MODULE_##_name = {.name = #_name};                           \
+    static __attribute__((used))                                                                  \
+    const MDS_LOG_Module_t *const __THIS_LOG_MODULE_HANDLE = &(G_MDS_LOG_MODULE_##_name)
+
+#define MDS_LOG_MODULE_LEVEL(_lvl)       (void)(__THIS_LOG_MODULE_LEVEL)
+#define MDS_LOG_MODULE_BACKEND(_backend) (void)(__THIS_LOG_MODULE_LEVEL)
+#endif
+
+#define __LOG_ARGSIZE_INDEX(idx, x, ...)                                                          \
+    _Generic((x),                                                                                 \
+        bool: sizeof(int),                                                                        \
+        char: sizeof(int),                                                                        \
+        signed char: sizeof(int),                                                                 \
+        unsigned char: sizeof(int),                                                               \
+        short: sizeof(int),                                                                       \
+        unsigned short: sizeof(int),                                                              \
+        int: sizeof(int),                                                                         \
+        unsigned int: sizeof(unsigned int),                                                       \
+        long: sizeof(long),                                                                       \
+        unsigned long: sizeof(unsigned long),                                                     \
+        long long: sizeof(long long),                                                             \
+        unsigned long long: sizeof(unsigned long long),                                           \
+        float: sizeof(float),                                                                     \
+        double: sizeof(double),                                                                   \
+        long double: sizeof(long double),                                                         \
+        default: sizeof(void *))
+
+#define __LOG_ARGUMENT_SIZE(...)                                                                  \
+    (0 + MDS_ARGUMENT_FOREACH_N(__LOG_ARGSIZE_INDEX, (+), 0, ##__VA_ARGS__))
+
+#if (defined(CONFIG_MDS_LOG_ENABLE) && (CONFIG_MDS_LOG_ENABLE != 0))
+#define MDS_LOG_PRINT(_lvl, _fmt, ...)                                                            \
+    do {                                                                                          \
+        if (_lvl <= __THIS_LOG_MODULE_LEVEL) {                                                    \
+            static __attribute__((section(__LOG_FORMAT_SECTION_STR(_lvl))))                       \
+            const char __logfmt[] = _fmt "\n";                                                    \
+            MDS_LOG_ModulePrintf(__THIS_LOG_MODULE_HANDLE, _lvl,                                  \
+                                 __LOG_ARGUMENT_SIZE(__VA_ARGS__), __logfmt, ##__VA_ARGS__);      \
+        }                                                                                         \
     } while (0)
 #else
-#define MDS_LOG_K(fmt, ...)
+#define MDS_LOG_PRINT(_lvl, _fmt, ...) (void)(__THIS_LOG_MODULE_LEVEL)
 #endif
 
-#if (MDS_LOG_BUILD_LEVEL >= MDS_LOG_LEVEL_FATAL)
-#define MDS_LOG_F(fmt, ...)                                                                                  \
-    do {                                                                                                     \
-        static const __attribute__((section(MDS_LOG_SECTION "fatal"))) char fmtstr[] = MDS_LOG_TAG fmt "\n"; \
-        MDS_LOG_Printf(MDS_LOG_LEVEL_FATAL, fmtstr, MDS_LOG_ARG_NUMS(__VA_ARGS__), ##__VA_ARGS__);           \
-    } while (0)
-#else
-#define MDS_LOG_F(fmt, ...)
-#endif
+#define MDS_LOG_F(_fmt, ...) MDS_LOG_PRINT(MDS_LOG_LEVEL_FAT, _fmt, ##__VA_ARGS__)
 
-#if (MDS_LOG_BUILD_LEVEL >= MDS_LOG_LEVEL_ERROR)
-#define MDS_LOG_E(fmt, ...)                                                                                  \
-    do {                                                                                                     \
-        static const __attribute__((section(MDS_LOG_SECTION "error"))) char fmtstr[] = MDS_LOG_TAG fmt "\n"; \
-        MDS_LOG_Printf(MDS_LOG_LEVEL_ERROR, fmtstr, MDS_LOG_ARG_NUMS(__VA_ARGS__), ##__VA_ARGS__);           \
-    } while (0)
-#else
-#define MDS_LOG_E(fmt, ...)
-#endif
+#define MDS_LOG_E(_fmt, ...) MDS_LOG_PRINT(MDS_LOG_LEVEL_ERR, _fmt, ##__VA_ARGS__)
 
-#if (MDS_LOG_BUILD_LEVEL >= MDS_LOG_LEVEL_WARN)
-#define MDS_LOG_W(fmt, ...)                                                                                 \
-    do {                                                                                                    \
-        static const __attribute__((section(MDS_LOG_SECTION "warn"))) char fmtstr[] = MDS_LOG_TAG fmt "\n"; \
-        MDS_LOG_Printf(MDS_LOG_LEVEL_WARN, fmtstr, MDS_LOG_ARG_NUMS(__VA_ARGS__), ##__VA_ARGS__);           \
-    } while (0)
-#else
-#define MDS_LOG_W(fmt, ...)
-#endif
+#define MDS_LOG_W(_fmt, ...) MDS_LOG_PRINT(MDS_LOG_LEVEL_WRN, _fmt, ##__VA_ARGS__)
 
-#if (MDS_LOG_BUILD_LEVEL >= MDS_LOG_LEVEL_INFO)
-#define MDS_LOG_I(fmt, ...)                                                                                 \
-    do {                                                                                                    \
-        static const __attribute__((section(MDS_LOG_SECTION "info"))) char fmtstr[] = MDS_LOG_TAG fmt "\n"; \
-        MDS_LOG_Printf(MDS_LOG_LEVEL_INFO, fmtstr, MDS_LOG_ARG_NUMS(__VA_ARGS__), ##__VA_ARGS__);           \
-    } while (0)
-#else
-#define MDS_LOG_I(fmt, ...)
-#endif
+#define MDS_LOG_I(_fmt, ...) MDS_LOG_PRINT(MDS_LOG_LEVEL_INF, _fmt, ##__VA_ARGS__)
 
-#if (MDS_LOG_BUILD_LEVEL >= MDS_LOG_LEVEL_DEBUG)
-#define MDS_LOG_D(fmt, ...)                                                                                  \
-    do {                                                                                                     \
-        static const __attribute__((section(MDS_LOG_SECTION "debug"))) char fmtstr[] = MDS_LOG_TAG fmt "\n"; \
-        MDS_LOG_Printf(MDS_LOG_LEVEL_DEBUG, fmtstr, MDS_LOG_ARG_NUMS(__VA_ARGS__), ##__VA_ARGS__);           \
-    } while (0)
-#else
-#define MDS_LOG_D(fmt, ...)
-#endif
+#define MDS_LOG_D(_fmt, ...) MDS_LOG_PRINT(MDS_LOG_LEVEL_DBG, _fmt, ##__VA_ARGS__)
 
-#if (MDS_LOG_BUILD_LEVEL >= MDS_LOG_LEVEL_TRACE)
-#define MDS_LOG_T(fmt, ...)                                                                                  \
-    do {                                                                                                     \
-        static const __attribute__((section(MDS_LOG_SECTION "trace"))) char fmtstr[] = MDS_LOG_TAG fmt "\n"; \
-        MDS_LOG_Printf(MDS_LOG_LEVEL_TRACE, fmtstr, MDS_LOG_ARG_NUMS(__VA_ARGS__), ##__VA_ARGS__);           \
-    } while (0)
-#else
-#define MDS_LOG_T(fmt, ...)
-#endif
+/* Function ---------------------------------------------------------------- */
+void MDS_LOG_RegisterVaPrint(MDS_LOG_VaPrint_t logVaPrint);
+
+__attribute__((format(printf, 4, 5))) void MDS_LOG_ModulePrintf(const MDS_LOG_Module_t *module,
+                                                                uint8_t level, size_t va_size,
+                                                                const char *fmt, ...);
 
 /* Panic ------------------------------------------------------------------- */
-extern __attribute__((noreturn)) void MDS_PanicPrintf(const char* fmt, ...);
+__attribute__((noreturn, format(printf, 2, 3))) void MDS_PanicPrintf(size_t va_size,
+                                                                     const char *fmt, ...);
 
-#define MDS_PANIC(fmt, ...)                                                                                \
-    do {                                                                                                   \
-        static const __attribute__((section(MDS_LOG_SECTION "panic"))) char fmtstr[] = "[PANIC]" fmt "\n"; \
-        MDS_PanicPrintf(fmtstr, ##__VA_ARGS__);                                                            \
+#if (defined(CONFIG_MDS_LOG_ENABLE) && (CONFIG_MDS_LOG_ENABLE != 0))
+#define MDS_PANIC(_fmt, ...)                                                                      \
+    do {                                                                                          \
+        void *caller = __builtin_return_address(0);                                               \
+        static __attribute__((section(__LOG_FORMAT_SECTION_STR(_))))                              \
+        const char __logfmt[] = "[PANIC] caller:%p " _fmt "\n";                                   \
+        MDS_PanicPrintf(sizeof(void *) + __LOG_ARGUMENT_SIZE(__VA_ARGS__), __logfmt, caller,      \
+                        ##__VA_ARGS__);                                                           \
     } while (0)
+#else
+#define MDS_PANIC(_fmt, ...)                                                                      \
+    do {                                                                                          \
+        MDS_PanicPrintf(0, NULL);                                                                 \
+    } while (0)
+#endif
 
 /* Assert ------------------------------------------------------------------ */
-#if (defined(MDS_LOG_ASSERT_ENABLE) && (MDS_LOG_ASSERT_ENABLE > 0))
-extern __attribute__((noreturn)) void MDS_AssertPrintf(const char* assertion, const char* function);
-
-#define MDS_ASSERT(condition)                                                                         \
-    do {                                                                                              \
-        if (!(condition)) {                                                                           \
-            static const __attribute__((section(MDS_LOG_SECTION "assert"))) char cond[] = #condition; \
-            MDS_AssertPrintf(cond, __FUNCTION__);                                                     \
-        }                                                                                             \
+#if (defined(CONFIG_MDS_LOG_ASSERT_ENABLE) && (CONFIG_MDS_LOG_ASSERT_ENABLE != 0))
+#define MDS_ASSERT(condition)                                                                     \
+    do {                                                                                          \
+        if (!(condition)) {                                                                       \
+            MDS_PANIC("[ASSERT] caller:%p", __builtin_return_address(0));                         \
+        }                                                                                         \
     } while (0)
-#elif (!defined(MDS_ASSERT))
+#else
 #define MDS_ASSERT(condition) (void)(condition)
 #endif
+
+/* Hook -------------------------------------------------------------------- */
+#define MDS_HOOK_DECLARE(_MODULE, _TYPE)                                                          \
+    MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE, (extern const _TYPE G_MDS_HOOK_##_MODULE),  \
+                    ())
+
+#define MDS_HOOK_DEFINE(_MODULE, _TYPE, ...)                                                      \
+    MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE,                                             \
+                    (const _TYPE G_MDS_HOOK_##_MODULE = {__DEBRACKET __VA_ARGS__}), ())
+
+#define MDS_HOOK_CALL(_MODULE, _func, ...)                                                        \
+    MDS_COND_CODE_1(CONFIG_MDS_HOOK_ENABLE_##_MODULE, (do {                                       \
+                        if ((G_MDS_HOOK_##_MODULE._func) != NULL) {                               \
+                            G_MDS_HOOK_##_MODULE._func(__DEBRACKET __VA_ARGS__);                  \
+                        }                                                                         \
+                    } while (0)),                                                                 \
+                    ())
+
+/* Compress ---------------------------------------------------------------- */
+typedef struct MDS_LOG_Compress {
+    uint32_t magic     : 8;
+    uint32_t address   : 24;  // 0xFFxxxxxx
+    uint32_t level     : 4;
+    uint32_t count     : 4;
+    uint32_t psn       : 12;
+    uint64_t timestamp : 44;  // ms
+    uint32_t args[0];
+} MDS_LOG_Compress_t;
+
+size_t MDS_LOG_CompressStructVa(MDS_LOG_Compress_t *log, size_t level, size_t cnt, const char *fmt,
+                                va_list ap);
+size_t MDS_LOG_CompressSturctPrint(MDS_LOG_Compress_t *log, size_t level, size_t cnt,
+                                   const char *fmt, ...);
 
 #ifdef __cplusplus
 }

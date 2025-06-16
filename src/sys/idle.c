@@ -13,17 +13,22 @@
 #include "kernel.h"
 
 /* Define ------------------------------------------------------------------ */
-#ifndef MDS_IDLE_THREAD_STACKSIZE
-#define MDS_IDLE_THREAD_STACKSIZE 384
+#ifndef CONFIG_MDS_IDLE_THREAD_STACKSIZE
+#define CONFIG_MDS_IDLE_THREAD_STACKSIZE 384
 #endif
 
-#ifndef MDS_IDLE_THREAD_TICKS
-#define MDS_IDLE_THREAD_TICKS 16
+#ifndef CONFIG_MDS_IDLE_THREAD_TICKS
+#define CONFIG_MDS_IDLE_THREAD_TICKS 16
+#endif
+
+#ifndef CONFIG_MDS_IDLE_THREAD_HOOKS
+#define CONFIG_MDS_IDLE_THREAD_HOOKS 0
 #endif
 
 /* Variable ---------------------------------------------------------------- */
+// multi idle for each cpu
 static MDS_Thread_t g_idleThread;
-static uint8_t g_idleStack[MDS_IDLE_THREAD_STACKSIZE];
+static uint8_t g_idleStack[CONFIG_MDS_IDLE_THREAD_STACKSIZE];
 
 /* Function ---------------------------------------------------------------- */
 __attribute__((weak)) void MDS_IdleLowPowerControl(void)
@@ -36,8 +41,8 @@ MDS_Thread_t *MDS_KernelIdleThread(void)
     return (&g_idleThread);
 }
 
-#if (defined(MDS_THREAD_IDLE_HOOK_SIZE) && (MDS_THREAD_IDLE_HOOK_SIZE > 0))
-static void (*g_idleHook[MDS_THREAD_IDLE_HOOK_SIZE])(void);
+#if (defined(CONFIG_MDS_IDLE_THREAD_HOOKS) && (CONFIG_MDS_IDLE_THREAD_HOOKS != 0))
+static void (*g_idleHook[CONFIG_MDS_IDLE_THREAD_HOOKS])(void);
 
 MDS_Err_t MDS_KernelAddIdleHook(void (*hook)(void))
 {
@@ -90,7 +95,7 @@ static void IDLE_ThreadDefunct(void)
             MDS_ObjectDeInit(&(thread->object));
         } else {
             MDS_SysMemFree(thread->stackBase);
-            MDS_ObjectDestory(&(thread->object));
+            MDS_ObjectDestroy(&(thread->object));
         }
     }
 }
@@ -102,7 +107,7 @@ static __attribute__((noreturn)) void IDLE_ThreadEntry(MDS_Arg_t *arg)
     MDS_LOOP {
         IDLE_ThreadDefunct();
 
-#if (defined(MDS_THREAD_IDLE_HOOK_SIZE) && (MDS_THREAD_IDLE_HOOK_SIZE > 0))
+#if (defined(CONFIG_MDS_THREAD_IDLE_HOOK_SIZE) && (CONFIG_MDS_THREAD_IDLE_HOOK_SIZE != 0))
         size_t idx;
         for (idx = 0; idx < ARRAY_SIZE(g_idleHook); idx++) {
             if (g_idleHook[idx] != NULL) {
@@ -117,8 +122,11 @@ static __attribute__((noreturn)) void IDLE_ThreadEntry(MDS_Arg_t *arg)
 
 void MDS_IdleThreadInit(void)
 {
-    MDS_Err_t err = MDS_ThreadInit(&g_idleThread, "idle", IDLE_ThreadEntry, NULL, &g_idleStack, sizeof(g_idleStack),
-                                   MDS_KERNEL_THREAD_PRIORITY_MAX, MDS_IDLE_THREAD_TICKS);
+    MDS_Err_t err = MDS_ThreadInit(&g_idleThread, "idle", IDLE_ThreadEntry, NULL, &g_idleStack,
+                                   sizeof(g_idleStack),
+                                   MDS_THREAD_PRIORITY(CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX),
+                                   MDS_TIMEOUT_TICKS(CONFIG_MDS_IDLE_THREAD_TICKS));
+
     if (err == MDS_EOK) {
         MDS_ThreadStartup(&g_idleThread);
     } else {

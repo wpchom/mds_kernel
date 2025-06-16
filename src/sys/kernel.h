@@ -19,30 +19,86 @@
 extern "C" {
 #endif
 
-/* Core -------------------------------------------------------------------- */
-extern void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg, void *exit);
-extern void MDS_CoreSchedulerStartup(void *toSP);
-extern void MDS_CoreSchedulerSwitch(void *from, void *to);
-extern bool MDS_CoreThreadStackCheck(void *sp);
+/* Typedef ----------------------------------------------------------------- */
+typedef struct MDS_KernelCpuInfo {
+    MDS_Thread_t *currThread;
+} MDS_KernelCpuInfo_t;
 
-/* Scheduler --------------------------------------------------------------- */
-extern void MDS_SchedulerInit(void);
-extern void MDS_SchedulerInsertThread(MDS_Thread_t *thread);
-extern void MDS_SchedulerRemoveThread(MDS_Thread_t *thread);
-extern MDS_Thread_t *MDS_SchedulerHighestPriorityThread(void);
+/* Core -------------------------------------------------------------------- */
+void MDS_CoreIdleSleep(void);
+MDS_Lock_t MDS_CoreInterruptLock(void);
+void MDS_CoreInterruptRestore(MDS_Lock_t lock);
+void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg,
+                              void *exit);
+void MDS_CoreSchedulerStartup(void *toSP);
+void MDS_CoreSchedulerSwitch(void *from, void *to);
+bool MDS_CoreThreadStackCheck(void *sp);
 
 /* Kernel ------------------------------------------------------------------ */
-extern void MDS_KernelSchedulerCheck(void);
-extern void MDS_KernelPushDefunct(MDS_Thread_t *thread);
-extern MDS_Thread_t *MDS_KernelPopDefunct(void);
-extern void MDS_KernelRemainThread(void);
-extern MDS_Thread_t *MDS_KernelIdleThread(void);
-extern void MDS_IdleThreadInit(void);
+static inline void MDS_KernelWaitQueueInit(MDS_WaitQueue_t *queueWait)
+{
+    MDS_DListInitNode(&(queueWait->list));
+}
+
+static inline MDS_Thread_t *MDS_KernelWaitQueuePeek(MDS_WaitQueue_t *queueWait)
+{
+    if (!MDS_DListIsEmpty(&(queueWait->list))) {
+        return (CONTAINER_OF(queueWait->list.next, MDS_Thread_t, nodeWait.node));
+    } else {
+        return (NULL);
+    }
+}
+
+MDS_Err_t MDS_KernelWaitQueueSuspend(MDS_WaitQueue_t *queueWait, MDS_Thread_t *thread,
+                                     MDS_Timeout_t timeout, bool isPrio);
+MDS_Err_t MDS_KernelWaitQueueUntil(MDS_WaitQueue_t *queueWait, MDS_Thread_t *thread,
+                                   MDS_Timeout_t timeout, bool isPrio, MDS_Lock_t *lock,
+                                   MDS_SpinLock_t *spinlock);
+MDS_Thread_t *MDS_KernelWaitQueueResume(MDS_WaitQueue_t *queueWait);
+void MDS_KernelWaitQueueDrain(MDS_WaitQueue_t *queueWait);
+
+void MDS_KernelSchedulerCheck(void);
+void MDS_KernelPushDefunct(MDS_Thread_t *thread);
+MDS_Thread_t *MDS_KernelPopDefunct(void);
+MDS_Thread_t *MDS_KernelIdleThread(void);
+void MDS_IdleThreadInit(void);
+
+/* Scheduler --------------------------------------------------------------- */
+void MDS_SchedulerInit(void);
+void MDS_SchedulerInsertThread(MDS_Thread_t *thread);
+void MDS_SchedulerRemoveThread(MDS_Thread_t *thread);
+MDS_Thread_t *MDS_SchedulerPeekThread(void);
+
+/* WorkQueue --------------------------------------------------------------- */
+void MDS_WorkQueueCheck(MDS_WorkQueue_t *workq, MDS_Lock_t *lock);
 
 /* Timer ------------------------------------------------------------------- */
-extern void MDS_SysTimerInit(void);
-extern void MDS_SysTimerCheck(void);
-extern MDS_Tick_t MDS_SysTimerNextTick(void);
+void MDS_SysTimerInit(void);
+void MDS_SysTimerCheck(void);
+MDS_Tick_t MDS_SysTimerNextTick(void);
+MDS_Err_t MDS_SysTimerStart(MDS_Timer_t *timer, MDS_Timeout_t duration, MDS_Timeout_t period);
+
+/* Thread ------------------------------------------------------------------ */
+void MDS_ThreadRemainTicks(MDS_Tick_t ticks);
+
+static inline void MDS_ThreadSetState(MDS_Thread_t *thread, MDS_ThreadState_t state)
+{
+    if (state == MDS_THREAD_STATE_RUNNING) {
+        thread->state = state;
+    } else {
+        thread->state = (thread->state & ~MDS_THREAD_STATE_MASK) | state;
+    }
+}
+
+static inline void MDS_ThreadSetYield(MDS_Thread_t *thread)
+{
+    thread->state |= MDS_THREAD_FLAG_YIELD;
+}
+
+static inline bool MDS_ThreadIsYield(const MDS_Thread_t *thread)
+{
+    return ((thread->state & MDS_THREAD_FLAG_YIELD) == MDS_THREAD_FLAG_YIELD);
+}
 
 #ifdef __cplusplus
 }

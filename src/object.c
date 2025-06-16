@@ -13,23 +13,21 @@
 #include "mds_sys.h"
 
 /* Define ------------------------------------------------------------------ */
-#define OBJECT_FLAG_TYPEMASK  0x7FU
-#define OBJECT_FLAG_CREATED   0x80U
-#define OBJECT_LIST_INIT(obj) [obj] = {.prev = &(g_objectList[obj]), .next = &(g_objectList[obj])}
+#define OBJECT_LIST_INIT(obj) [obj] = {.list = MDS_DLIST_INIT(g_objectList[obj].list)}
 
 /* Variable ---------------------------------------------------------------- */
-static MDS_ListNode_t g_objectList[] = {
-    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_DEVICE),  //
-#ifndef MDS_KERNEL_REDIRECT
-    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_TIMER),      //
+static MDS_ObjectInfo_t g_objectList[] = {
+    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_DEVICE),     //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_THREAD),     //
+    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_WORKQUEUE),  //
+    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_WORKNODE),   //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_SEMAPHORE),  //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_MUTEX),      //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_EVENT),      //
+    OBJECT_LIST_INIT(MDS_OBJECT_TYPE_POLL),       //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_MSGQUEUE),   //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_MEMPOOL),    //
     OBJECT_LIST_INIT(MDS_OBJECT_TYPE_MEMHEAP),    //
-#endif
 };
 
 /* Function ---------------------------------------------------------------- */
@@ -38,19 +36,17 @@ MDS_Err_t MDS_ObjectInit(MDS_Object_t *object, MDS_ObjectType_t type, const char
     MDS_ASSERT(object != NULL);
     MDS_ASSERT(type < ARRAY_SIZE(g_objectList));
 
-    if (object->flags != MDS_OBJECT_TYPE_NONE) {
+    if (object->type != MDS_OBJECT_TYPE_NONE) {
         return (MDS_EAGAIN);
     }
 
-    MDS_ListInitNode(&(object->node));
-    if (name != NULL) {
-        MDS_MemBuffCcpy(object->name, name, '\0', sizeof(object->name));
-    }
-    object->flags = type;
+    MDS_DListInitNode(&(object->node));
+    object->type = type;
+    (void)MDS_Strlcpy(object->name, name, sizeof(object->name));
 
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-    MDS_ListInsertNodePrev(&(g_objectList[type]), &(object->node));
-    MDS_CoreInterruptRestore(lock);
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_objectList[type].spinlock));
+    MDS_DListInsertNodePrev(&(g_objectList[type].list), &(object->node));
+    MDS_CriticalRestore(&(g_objectList[type].spinlock), lock);
 
     return (MDS_EOK);
 }
@@ -59,10 +55,10 @@ MDS_Err_t MDS_ObjectDeInit(MDS_Object_t *object)
 {
     MDS_ASSERT(object != NULL);
 
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-    MDS_ListRemoveNode(&(object->node));
-    object->flags = MDS_OBJECT_TYPE_NONE;
-    MDS_CoreInterruptRestore(lock);
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_objectList[object->type].spinlock));
+    MDS_DListRemoveNode(&(object->node));
+    object->type = MDS_OBJECT_TYPE_NONE;
+    MDS_CriticalRestore(&(g_objectList[object->type].spinlock), lock);
 
     return (MDS_EOK);
 }
@@ -73,13 +69,13 @@ MDS_Object_t *MDS_ObjectCreate(size_t typesz, MDS_ObjectType_t type, const char 
 
     if (object != NULL) {
         MDS_ObjectInit(object, type, name);
-        object->flags |= OBJECT_FLAG_CREATED;
+        object->created = true;
     }
 
     return (object);
 }
 
-MDS_Err_t MDS_ObjectDestory(MDS_Object_t *object)
+MDS_Err_t MDS_ObjectDestroy(MDS_Object_t *object)
 {
     MDS_ASSERT(object != NULL);
     MDS_ASSERT(MDS_ObjectIsCreated(object));
@@ -98,48 +94,28 @@ MDS_Object_t *MDS_ObjectFind(const MDS_ObjectType_t type, const char *name)
 {
     MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
 
-    MDS_Object_t *iter = NULL;
+    MDS_Object_t *find = NULL;
 
-    if ((name != NULL) && (name[0] != '\0')) {
-        MDS_LIST_FOREACH_NEXT (iter, node, &(g_objectList[type])) {
-            if (strncmp(iter->name, name, sizeof(iter->name)) == 0) {
-                return (iter);
-            }
+    if ((name == NULL) || (name[0] == '\0')) {
+        return (NULL);
+    }
+
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_objectList[type].spinlock));
+
+    MDS_Object_t *iter = NULL;
+    MDS_LIST_FOREACH_NEXT (iter, node, &(g_objectList[type].list)) {
+        if (strncmp(name, iter->name, sizeof(iter->name)) == 0) {
+            find = iter;
+            break;
         }
     }
 
-    return (NULL);
+    MDS_CriticalRestore(&(g_objectList[type].spinlock), lock);
+
+    return (find);
 }
 
-MDS_Object_t *MDS_ObjectPrev(const MDS_Object_t *object)
-{
-    MDS_ASSERT(object != NULL);
-
-    MDS_ObjectType_t type = MDS_ObjectGetType(object);
-    MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
-
-    if (object->node.prev != &(g_objectList[type])) {
-        return (CONTAINER_OF(object->node.prev, MDS_Object_t, node));
-    } else {
-        return (NULL);
-    }
-}
-
-MDS_Object_t *MDS_ObjectNext(const MDS_Object_t *object)
-{
-    MDS_ASSERT(object != NULL);
-
-    MDS_ObjectType_t type = MDS_ObjectGetType(object);
-    MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
-
-    if (object->node.next != &(g_objectList[type])) {
-        return (CONTAINER_OF(object->node.next, MDS_Object_t, node));
-    } else {
-        return (NULL);
-    }
-}
-
-const MDS_ListNode_t *MDS_ObjectGetList(MDS_ObjectType_t type)
+MDS_ObjectInfo_t *MDS_ObjectGetInfo(MDS_ObjectType_t type)
 {
     MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
 
@@ -150,7 +126,7 @@ size_t MDS_ObjectGetCount(MDS_ObjectType_t type)
 {
     MDS_ASSERT((type != MDS_OBJECT_TYPE_NONE) && (type < ARRAY_SIZE(g_objectList)));
 
-    return (MDS_ListGetLength(&(g_objectList[type])));
+    return (MDS_DListGetCount(&(g_objectList[type].list)));
 }
 
 const char *MDS_ObjectGetName(const MDS_Object_t *object)
@@ -164,12 +140,12 @@ MDS_ObjectType_t MDS_ObjectGetType(const MDS_Object_t *object)
 {
     MDS_ASSERT(object != NULL);
 
-    return ((MDS_ObjectType_t)(object->flags & OBJECT_FLAG_TYPEMASK));
+    return (object->type);
 }
 
 bool MDS_ObjectIsCreated(const MDS_Object_t *object)
 {
     MDS_ASSERT(object != NULL);
 
-    return ((object->flags & OBJECT_FLAG_CREATED) != 0U);
+    return (object->created);
 }

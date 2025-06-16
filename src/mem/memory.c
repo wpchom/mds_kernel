@@ -12,6 +12,9 @@
 /* Include ----------------------------------------------------------------- */
 #include "mds_sys.h"
 
+/* Define ------------------------------------------------------------------ */
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
+
 /* Function ---------------------------------------------------------------- */
 MDS_Err_t MDS_MemHeapInit(MDS_MemHeap_t *memheap, const char *name, void *base, size_t size,
                           const MDS_MemHeapOps_t *ops)
@@ -38,7 +41,7 @@ MDS_Err_t MDS_MemHeapInit(MDS_MemHeap_t *memheap, const char *name, void *base, 
 
         if (err == MDS_EOK) {
             memheap->ops = ops;
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE > 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
             memheap->size.max = 0;
             memheap->size.cur = 0;
             memheap->size.total = size;
@@ -78,7 +81,7 @@ void MDS_MemHeapFree(MDS_MemHeap_t *memheap, void *ptr)
         return;
     }
 
-    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_CLOCK_TICK_FOREVER);
+    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_TIMEOUT_FOREVER);
     if (err == MDS_EOK) {
         if ((memheap->ops != NULL) && (memheap->ops->free != NULL)) {
             memheap->ops->free(memheap, ptr);
@@ -95,7 +98,7 @@ void *MDS_MemHeapAlloc(MDS_MemHeap_t *memheap, size_t size)
 
     void *pbuf = NULL;
 
-    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_CLOCK_TICK_FOREVER);
+    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_TIMEOUT_FOREVER);
     if (err == MDS_EOK) {
         if ((memheap->ops != NULL) && (memheap->ops->alloc != NULL)) {
             pbuf = memheap->ops->alloc(memheap, size);
@@ -121,7 +124,7 @@ void *MDS_MemHeapRealloc(MDS_MemHeap_t *memheap, void *ptr, size_t size)
 
     void *pbuf = NULL;
 
-    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_CLOCK_TICK_FOREVER);
+    MDS_Err_t err = MDS_SemaphoreAcquire(&(memheap->lock), MDS_TIMEOUT_FOREVER);
     if (err == MDS_EOK) {
         if ((memheap->ops != NULL) && (memheap->ops->realloc != NULL)) {
             pbuf = memheap->ops->realloc(memheap, ptr, size);
@@ -156,8 +159,8 @@ extern void MDS_MemHeapSize(MDS_MemHeap_t *memheap, MDS_MemHeapSize_t *size)
 }
 
 /* SysMem ------------------------------------------------------------------ */
-#ifndef MDS_SYSMEM_HEAP_OPS
-#define MDS_SYSMEM_HEAP_OPS G_MDS_MEMHEAP_OPS_LLFF
+#ifndef CONFIG_MDS_SYSMEM_HEAP_OPS
+#define CONFIG_MDS_SYSMEM_HEAP_OPS G_MDS_MEMHEAP_OPS_LLFF
 #endif
 
 static MDS_MemHeap_t g_sysMemHeap;
@@ -194,7 +197,7 @@ void MDS_SysMemInit(void)
         return;
     }
 
-    MDS_MemHeapInit(&g_sysMemHeap, "sysmem", buff, size, &MDS_SYSMEM_HEAP_OPS);
+    MDS_MemHeapInit(&g_sysMemHeap, "sysmem", buff, size, &CONFIG_MDS_SYSMEM_HEAP_OPS);
 }
 
 void MDS_SysMemFree(void *ptr)

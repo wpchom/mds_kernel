@@ -13,10 +13,6 @@
 #include "mds_sys.h"
 
 /* Define ----------------------------------------------------------------- */
-#ifndef MDS_CORE_BACKTRACE_DEPTH
-#define MDS_CORE_BACKTRACE_DEPTH 16
-#endif
-
 #define MSTATUS_UIE  0x00000001
 #define MSTATUS_SIE  0x00000002
 #define MSTATUS_HIE  0x00000004
@@ -333,18 +329,18 @@ inline intptr_t MDS_CoreInterruptCurrent(void)
     return (mcause);
 }
 
-inline MDS_Item_t MDS_CoreInterruptLock(void)
+inline MDS_Lock_t MDS_CoreInterruptLock(void)
 {
-    register intptr_t result;
+    register MDS_Lock_t result;
 
-    __asm volatile("csrrci      %0, mstatus, %1" : "=r"(result) : "i"(MSTATUS_MIE));
+    __asm volatile("csrrci      %0, mstatus, %1" : "=r"(result.key) : "i"(MSTATUS_MIE));
 
     return (result);
 }
 
-inline void MDS_CoreInterruptRestore(MDS_Item_t lock)
+inline void MDS_CoreInterruptRestore(MDS_Lock_t lock)
 {
-    __asm volatile("csrw        mstatus, %0" : : "r"(lock) : "memory");
+    __asm volatile("csrw        mstatus, %0" : : "r"(lock.key) : "memory");
 }
 
 inline void MDS_CoreIdleSleep(void)
@@ -353,10 +349,12 @@ inline void MDS_CoreIdleSleep(void)
 }
 
 /* CoreThread -------------------------------------------------------------- */
-void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg, void *exit)
+void *MDS_CoreThreadStackInit(void *stackBase, size_t stackSize, void *entry, void *arg,
+                              void *exit)
 {
 #ifndef __riscv_32e
-    uintptr_t sp = VALUE_ALIGN((uintptr_t)(stackBase) + stackSize, sizeof(uint64_t) + sizeof(uint64_t));
+    uintptr_t sp = VALUE_ALIGN((uintptr_t)(stackBase) + stackSize,
+                               sizeof(uint64_t) + sizeof(uint64_t));
 #else
     uintptr_t sp = VALUE_ALIGN((uintptr_t)(stackBase) + stackSize, sizeof(uint32_t));
 #endif
@@ -387,20 +385,22 @@ bool MDS_CoreThreadStackCheck(MDS_Thread_t *thread)
 
     if (((*(uint8_t *)(thread->stackBase)) != '@') ||
         ((uintptr_t)(thread->stackPoint) <= (uintptr_t)(thread->stackBase)) ||
-        ((uintptr_t)(thread->stackPoint) > ((uintptr_t)(thread->stackBase) + (uintptr_t)(thread->stackSize)))) {
-        MDS_LOG_F("[CORE] thread(%p) entry:%p stackbase:%p stacksize:%u overflow", thread, thread->entry,
-                  thread->stackPoint, thread->stackBase, thread->stackSize);
+        ((uintptr_t)(thread->stackPoint) >
+         ((uintptr_t)(thread->stackBase) + (uintptr_t)(thread->stackSize)))) {
+        MDS_LOG_F("[CORE] thread(%p) entry:%p stackbase:%p stacksize:%u overflow", thread,
+                  thread->entry, thread->stackPoint, thread->stackBase, thread->stackSize);
         return (false);
     }
 
-#if (defined(MDS_KERNEL_STATS_ENABLE) && (MDS_KERNEL_STATS_ENABLE > 0))
+#if (defined(CONFIG_MDS_KERNEL_STATS_ENABLE) && (CONFIG_MDS_KERNEL_STATS_ENABLE != 0))
 #endif
 
     return (true);
 }
 
 /* CoreScheduler ----------------------------------------------------------- */
-#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX > 0))
+#if (defined(CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&                                            \
+     (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
 static struct CoreScheduler {
     uintptr_t swflag;
     uintptr_t *fromSP;
@@ -481,7 +481,7 @@ void MDS_CoreSchedulerSwitch(void *fromSP, void *toSP)
 #endif
 
 /* Backtrace --------------------------------------------------------------- */
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH > 0))
+#if (defined(CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (CONFIG_MDS_CORE_BACKTRACE_DEPTH != 0))
 __attribute__((weak)) bool MDS_CoreStackPointerInCode(uintptr_t pc)
 {
 #if defined(__IAR_SYSTEMS_ICC__)
@@ -517,7 +517,8 @@ static uintptr_t CORE_DisassemblyInsIsBL(uintptr_t addr)
     if (((ins1 & RV32I_JAL_MASK) == RV32I_JAL_INS) || (ins1 & RV32I_JALR_MASK) == RV32I_JALR_INS) {
         return (addr);
     } else if (((ins1 & RV32I_OP_MASK) != RV32I_OP_MASK) &&
-               (((ins2 & RV32C_JAL_MASK) == RV32C_JAL_INS) || ((ins2 & RV32C_JALR_MASK) == RV32C_JALR_INS))) {
+               (((ins2 & RV32C_JAL_MASK) == RV32C_JAL_INS) ||
+                ((ins2 & RV32C_JALR_MASK) == RV32C_JALR_INS))) {
         return (addr + sizeof(uint16_t));
     } else {
         return (0);
@@ -527,7 +528,8 @@ static uintptr_t CORE_DisassemblyInsIsBL(uintptr_t addr)
 
 static void CORE_StackBacktrace(uintptr_t stackPoint, uintptr_t stackLimit)
 {
-    for (size_t dp = 0; (dp < MDS_CORE_BACKTRACE_DEPTH) && (stackPoint < stackLimit); stackPoint += sizeof(uintptr_t)) {
+    for (size_t dp = 0; (dp < CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (stackPoint < stackLimit);
+         stackPoint += sizeof(uintptr_t)) {
         uintptr_t pc = *((uintptr_t *)stackPoint) - sizeof(uintptr_t);
         if (!MDS_CoreStackPointerInCode(pc)) {
             continue;
@@ -555,14 +557,14 @@ static void CORE_ExceptionBacktrace(uintptr_t mcause, uintptr_t mscratch, uintpt
     UNUSED(mscratch);
     UNUSED(sp);
 
-#if (defined(MDS_CORE_BACKTRACE_DEPTH) && (MDS_CORE_BACKTRACE_DEPTH > 0))
+#if (defined(CONFIG_MDS_CORE_BACKTRACE_DEPTH) && (CONFIG_MDS_CORE_BACKTRACE_DEPTH != 0))
     MDS_LOG_F("mcause:%d mscratch:0x%x sp:0x%x backtrace", mcause, mscratch, sp);
     CORE_StackBacktrace((mscratch != 0) ? (mscratch) : (sp), (uintptr_t)__StackTop);
 
     MDS_Thread_t *thread = MDS_KernelCurrentThread();
     if (thread != NULL) {
-        MDS_LOG_F("current thread(%p) entry:%p sp:%p stackbase:%p stacksize:%u backtrace", thread, thread->entry, sp,
-                  thread->stackBase, thread->stackSize);
+        MDS_LOG_F("current thread(%p) entry:%p sp:%p stackbase:%p stacksize:%u backtrace", thread,
+                  thread->entry, sp, thread->stackBase, thread->stackSize);
         CORE_StackBacktrace(sp, (uintptr_t)(thread->stackBase) + thread->stackSize);
     }
 #endif
@@ -582,7 +584,8 @@ void MDS_CorePanicTrace(void)
     MDS_CoreExceptionCallback(true);
 }
 
-__attribute__((noreturn)) void Exception_Handler(uintptr_t mcause, uintptr_t mscratch, uintptr_t sp)
+__attribute__((noreturn)) void Exception_Handler(uintptr_t mcause, uintptr_t mscratch,
+                                                 uintptr_t sp)
 {
     uintptr_t mepc, mtval;
 
@@ -596,19 +599,23 @@ __attribute__((noreturn)) void Exception_Handler(uintptr_t mcause, uintptr_t msc
     if (g_exceptionContext == NULL) {
         g_exceptionContext = (struct StackFrame *)sp;
 
-        MDS_LOG_F("ra:%x mstatus:%x fcsr:%x tp:%x", g_exceptionContext->ra, g_exceptionContext->mstatus,
-                  g_exceptionContext->fcsr, g_exceptionContext->tp);
-        MDS_LOG_F("t0:%x t1:%x t2:%x s0_fp:%x s1:%x", g_exceptionContext->t0, g_exceptionContext->t1,
-                  g_exceptionContext->t2, g_exceptionContext->s0_fp, g_exceptionContext->s1);
-        MDS_LOG_F("a0:%x a1:%x a2:%x a3:%x a4:%x a5:%x", g_exceptionContext->a0, g_exceptionContext->a1,
-                  g_exceptionContext->a2, g_exceptionContext->a3, g_exceptionContext->a4, g_exceptionContext->a5);
+        MDS_LOG_F("ra:%x mstatus:%x fcsr:%x tp:%x", g_exceptionContext->ra,
+                  g_exceptionContext->mstatus, g_exceptionContext->fcsr, g_exceptionContext->tp);
+        MDS_LOG_F("t0:%x t1:%x t2:%x s0_fp:%x s1:%x", g_exceptionContext->t0,
+                  g_exceptionContext->t1, g_exceptionContext->t2, g_exceptionContext->s0_fp,
+                  g_exceptionContext->s1);
+        MDS_LOG_F("a0:%x a1:%x a2:%x a3:%x a4:%x a5:%x", g_exceptionContext->a0,
+                  g_exceptionContext->a1, g_exceptionContext->a2, g_exceptionContext->a3,
+                  g_exceptionContext->a4, g_exceptionContext->a5);
 #ifndef __riscv_32e
-        MDS_LOG_F("a6:%x a7:%x s2:%x s3:%x s4:%x s5:%x", g_exceptionContext->a6, g_exceptionContext->a7,
-                  g_exceptionContext->s2, g_exceptionContext->s3, g_exceptionContext->s4, g_exceptionContext->s5);
-        MDS_LOG_F("s6:%x s7:%x s8:%x s9:%x s10:%x s11:%x", g_exceptionContext->s6, g_exceptionContext->s7,
-                  g_exceptionContext->s8, g_exceptionContext->s9, g_exceptionContext->s10, g_exceptionContext->s11);
-        MDS_LOG_F("t3:%x t4:%x t5:%x t6:%x", g_exceptionContext->t3, g_exceptionContext->t4, g_exceptionContext->t5,
-                  g_exceptionContext->t6);
+        MDS_LOG_F("a6:%x a7:%x s2:%x s3:%x s4:%x s5:%x", g_exceptionContext->a6,
+                  g_exceptionContext->a7, g_exceptionContext->s2, g_exceptionContext->s3,
+                  g_exceptionContext->s4, g_exceptionContext->s5);
+        MDS_LOG_F("s6:%x s7:%x s8:%x s9:%x s10:%x s11:%x", g_exceptionContext->s6,
+                  g_exceptionContext->s7, g_exceptionContext->s8, g_exceptionContext->s9,
+                  g_exceptionContext->s10, g_exceptionContext->s11);
+        MDS_LOG_F("t3:%x t4:%x t5:%x t6:%x", g_exceptionContext->t3, g_exceptionContext->t4,
+                  g_exceptionContext->t5, g_exceptionContext->t6);
 #endif
 
         CORE_ExceptionBacktrace(mcause, mscratch, sp);
@@ -649,7 +656,8 @@ __attribute__((naked, __aligned__(0x04))) void Trap_Handler(void)
         __asm volatile("csrrw       sp, mscratch, sp");
     }
 
-#if (defined(MDS_KERNEL_THREAD_PRIORITY_MAX) && (MDS_KERNEL_THREAD_PRIORITY_MAX > 0))
+#if (defined(CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX) &&                                            \
+     (CONFIG_MDS_KERNEL_THREAD_PRIORITY_MAX != 0))
     if (g_coreScheduler.swflag) {
         g_coreScheduler.swflag = false;
 

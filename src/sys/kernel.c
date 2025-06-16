@@ -12,121 +12,222 @@
 /* Include ----------------------------------------------------------------- */
 #include "kernel.h"
 
-/* Hook -------------------------------------------------------------------- */
-MDS_HOOK_INIT(SCHEDULER_SWITCH, MDS_Thread_t *toThread, MDS_Thread_t *fromThread);
-
 /* Define ------------------------------------------------------------------ */
-#if (defined(MDS_SCHEDULER_DEBUG_ENABLE) && (MDS_SCHEDULER_DEBUG_ENABLE > 0))
-#define MDS_SCHEDULER_DEBUG(fmt, args...) MDS_LOG_D(fmt, ##args)
-#else
-#define MDS_SCHEDULER_DEBUG(fmt, args...)
-#endif
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
+MDS_HOOK_DEFINE(KERNEL, __attribute__((weak)) MDS_HOOK_Kernel_t, ());
 
 /* Variable ---------------------------------------------------------------- */
-static volatile int g_sysCriticalNest = 0;
+static struct {
+    int lockNest;
+    MDS_SpinLock_t spinlock;
+} g_sysScheduler;
+
+static struct {
+    MDS_DListNode_t queue;
+    MDS_SpinLock_t spinlock;
+} g_sysDefunct = {.queue = MDS_DLIST_INIT(g_sysDefunct.queue)};
+
+// static MDS_KernelCpuInfo_t g_sysCpuInfo[CONFIG_MDS_KERNEL_SMP_CPUS] = {0};
 static MDS_Thread_t *g_sysCurrThread = NULL;
-static MDS_ListNode_t g_sysDefunctList = {.prev = &g_sysDefunctList, .next = &g_sysDefunctList};
 
 /* Function ---------------------------------------------------------------- */
+void MDS_KernelSchdulerLockAcquire(void)
+{
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_sysScheduler.spinlock));
+
+    // atomic
+    g_sysScheduler.lockNest += 1;
+
+    MDS_CriticalRestore(&(g_sysScheduler.spinlock), lock);
+}
+
+void MDS_KernelSchdulerLockRelease(void)
+{
+    int nest = 0;
+
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_sysScheduler.spinlock));
+
+    // atomic
+    g_sysScheduler.lockNest -= 1;
+    if (g_sysScheduler.lockNest < 0) {
+        g_sysScheduler.lockNest = 0;
+        MDS_LOG_E("[kernel] scheduler lock nest error, set to 0");
+    }
+    nest = g_sysScheduler.lockNest;
+
+    MDS_CriticalRestore(&(g_sysScheduler.spinlock), lock);
+
+    if (nest == 0) {
+        MDS_KernelSchedulerCheck();
+    }
+}
+
+int MDS_KernelSchdulerLockLevel(void)
+{
+    return (g_sysScheduler.lockNest);
+}
+
 void MDS_KernelSchedulerCheck(void)
 {
-    MDS_Item_t lock = MDS_CoreInterruptLock();
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_sysScheduler.spinlock));
 
     do {
-        if (MDS_KernelGetCritical() != 0) {
+        MDS_Thread_t *currThread = MDS_KernelCurrentThread();
+        if ((g_sysScheduler.lockNest != 0) || (currThread == NULL)) {
             break;
         }
 
-        MDS_Thread_t *toThread = MDS_SchedulerHighestPriorityThread();
-        if (toThread == NULL) {
-            toThread = MDS_KernelIdleThread();
-        }
-
-        MDS_Thread_t *currThread = g_sysCurrThread;
-        bool threadReady = false;
-
-        if ((currThread->state & MDS_THREAD_STATE_MASK) == MDS_THREAD_STATE_RUNNING) {
-            if (currThread->currPrio < toThread->currPrio) {
+        MDS_Thread_t *toThread = MDS_SchedulerPeekThread();
+        if (MDS_ThreadGetState(currThread) == MDS_THREAD_STATE_RUNNING) {
+            if (currThread->currPrio.priority < toThread->currPrio.priority) {
                 toThread = currThread;
-            } else if ((currThread->currPrio == toThread->currPrio) &&
-                       ((currThread->state & MDS_THREAD_FLAG_YIELD) == 0)) {
+            } else if ((currThread->currPrio.priority == toThread->currPrio.priority) &&
+                       (!MDS_ThreadIsYield(currThread))) {
                 toThread = currThread;
             } else {
-                threadReady = true;
+                MDS_SchedulerInsertThread(currThread);
+                MDS_ThreadSetState(currThread, MDS_THREAD_STATE_READY);
             }
-            currThread->state &= ~MDS_THREAD_FLAG_YIELD;
         }
 
+        MDS_SchedulerRemoveThread(toThread);
+        MDS_ThreadSetState(toThread, MDS_THREAD_STATE_RUNNING);
+
         if (toThread != currThread) {
-            g_sysCurrThread = toThread;
-            if (threadReady) {
-                MDS_SchedulerInsertThread(currThread);
-            }
-
-            MDS_SchedulerRemoveThread(toThread);
-            toThread->state = (toThread->state & ~MDS_THREAD_STATE_MASK) | MDS_THREAD_STATE_RUNNING;
-
-            MDS_SCHEDULER_DEBUG("switch to thread(%p) entry:%p sp:%p priority:%u from thread(%p) entry:%p sp:%p",
-                                toThread, toThread->entry, toThread->stackPoint, toThread->currPrio, currThread,
-                                currThread->entry, currThread->stackPoint);
+            MDS_LOG_D(
+                "[kernel]switch to thread(%p) entry:%p sp:%p priority:%u from thread(%p) entry:%p sp:%p",
+                toThread, toThread->entry, toThread->stackPoint, toThread->currPrio.priority,
+                currThread, currThread->entry, currThread->stackPoint);
 
             if (!MDS_CoreThreadStackCheck(toThread)) {
-                MDS_PANIC("switch to thread(%p) entry:%p stack has broken", toThread, toThread->entry,
-                          toThread->stackPoint);
+                MDS_PANIC("switch to thread(%p) entry:%p stack:%p has broken", toThread,
+                          toThread->entry, toThread->stackPoint);
             }
 
-            MDS_HOOK_CALL(SCHEDULER_SWITCH, toThread, currThread);
+            MDS_HOOK_CALL(KERNEL, scheduler, (toThread, currThread));
+
+            // cpuInfo
+            g_sysCurrThread = toThread;
 
             MDS_CoreSchedulerSwitch(&(currThread->stackPoint), &(toThread->stackPoint));
-        } else {
-            MDS_SchedulerRemoveThread(toThread);
-            toThread->state = (toThread->state & ~MDS_THREAD_STATE_MASK) | MDS_THREAD_STATE_RUNNING;
         }
     } while (0);
 
-    MDS_CoreInterruptRestore(lock);
+    MDS_CriticalRestore(&(g_sysScheduler.spinlock), lock);
+}
+
+MDS_Err_t MDS_KernelWaitQueueSuspend(MDS_WaitQueue_t *queueWait, MDS_Thread_t *thread,
+                                     MDS_Timeout_t timeout, bool isPrio)
+{
+    MDS_Err_t err = MDS_ThreadSuspend(thread);
+    if (err != MDS_EOK) {
+        return (err);
+    }
+
+    MDS_Thread_t *find = NULL;
+
+    if (isPrio) {
+        MDS_Thread_t *iter = NULL;
+        MDS_LIST_FOREACH_NEXT (iter, nodeWait.node, &(queueWait->list)) {
+            if (thread->currPrio.priority < iter->currPrio.priority) {
+                find = iter;
+                break;
+            }
+        }
+    }
+
+    if (find != NULL) {
+        MDS_DListInsertNodePrev(&(find->nodeWait.node), &(thread->nodeWait.node));
+    } else {
+        MDS_DListInsertNodePrev(&(queueWait->list), &(thread->nodeWait.node));
+    }
+
+    err = MDS_SysTimerStart(&(thread->timer), timeout, MDS_TIMEOUT_NO_WAIT);
+
+    return (err);
+}
+
+MDS_Err_t MDS_KernelWaitQueueUntil(MDS_WaitQueue_t *queueWait, MDS_Thread_t *thread,
+                                   MDS_Timeout_t timeout, bool isPrio, MDS_Lock_t *lock,
+                                   MDS_SpinLock_t *spinlock)
+{
+    MDS_Err_t err = MDS_EOK;
+    MDS_Tick_t deltaTick = MDS_ClockGetTickCount();
+    MDS_KernelWaitQueueSuspend(queueWait, thread, timeout, isPrio);
+
+    MDS_CriticalRestore(spinlock, *lock);
+
+    MDS_KernelSchedulerCheck();
+
+    *lock = MDS_CriticalLock(spinlock);
+
+    if (thread->err != MDS_EOK) {
+        err = thread->err;
+        return (err);
+    }
+
+    deltaTick = MDS_ClockGetTickCount() - deltaTick;
+    if (timeout.ticks <= deltaTick) {
+        err = MDS_ETIMEOUT;
+    }
+
+    return (err);
+}
+
+MDS_Thread_t *MDS_KernelWaitQueueResume(MDS_WaitQueue_t *queueWait)
+{
+    MDS_Thread_t *thread = MDS_KernelWaitQueuePeek(queueWait);
+    if (thread != NULL) {
+        // no need to remove from list, thread resume will remove it to ready list
+        MDS_Err_t err = MDS_ThreadResume(thread);
+        if (err != MDS_EOK) {
+            MDS_LOG_W("[kernel] wait queue resume thread err=%d", err);
+        }
+    }
+
+    return (thread);
+}
+
+void MDS_KernelWaitQueueDrain(MDS_WaitQueue_t *queueWait)
+{
+    do {
+        MDS_Thread_t *thread = MDS_KernelWaitQueueResume(queueWait);
+        if (thread == NULL) {
+            break;
+        }
+
+        thread->err = MDS_ENOENT;
+    } while (0);
 }
 
 void MDS_KernelPushDefunct(MDS_Thread_t *thread)
 {
-    MDS_SCHEDULER_DEBUG("push defunct thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry, thread->stackPoint,
-                        thread->currPrio);
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_sysDefunct.spinlock));
+    MDS_DListInsertNodePrev(&(g_sysDefunct.queue), &(thread->nodeWait.node));
+    MDS_CriticalRestore(&(g_sysDefunct.spinlock), lock);
 
-    MDS_ListInsertNodePrev(&g_sysDefunctList, &(thread->node));
+    MDS_LOG_D("[kernel] push defunct thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry,
+              thread->stackPoint, thread->currPrio.priority);
 }
 
 MDS_Thread_t *MDS_KernelPopDefunct(void)
 {
     MDS_Thread_t *thread = NULL;
 
-    if (!MDS_ListIsEmpty(&g_sysDefunctList)) {
-        thread = CONTAINER_OF(g_sysDefunctList.next, MDS_Thread_t, node);
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_sysDefunct.spinlock));
 
-        MDS_SCHEDULER_DEBUG("pop defunct thread(%p) entry:%p sp:%p priority:%u", thread, thread->entry,
-                            thread->stackPoint, thread->currPrio);
+    if (!MDS_DListIsEmpty(&g_sysDefunct.queue)) {
+        thread = CONTAINER_OF(g_sysDefunct.queue.next, MDS_Thread_t, nodeWait.node);
 
-        MDS_ListRemoveNode(&(thread->node));
+        MDS_LOG_D("[kernel] pop defunct thread(%p) entry:%p sp:%p priority:%u", thread,
+                  thread->entry, thread->stackPoint, thread->currPrio.priority);
+
+        MDS_DListRemoveNode(&(thread->nodeWait.node));
     }
+
+    MDS_CriticalRestore(&(g_sysDefunct.spinlock), lock);
 
     return (thread);
-}
-
-void MDS_KernelRemainThread(void)
-{
-    MDS_Thread_t *thread = MDS_KernelCurrentThread();
-    if (thread == NULL) {
-        return;
-    }
-
-    if (thread->remainTick > 0) {
-        thread->remainTick -= 1;
-    }
-
-    if (thread->remainTick == 0) {
-        thread->remainTick = thread->initTick;
-        thread->state |= MDS_THREAD_FLAG_YIELD;
-        MDS_KernelSchedulerCheck();
-    }
 }
 
 void MDS_KernelInit(void)
@@ -140,81 +241,42 @@ void MDS_KernelInit(void)
 
 void MDS_KernelStartup(void)
 {
-    MDS_Thread_t *toThread = MDS_SchedulerHighestPriorityThread();
-    if (toThread == NULL) {
-        toThread = MDS_KernelIdleThread();
-    }
+    MDS_Thread_t *toThread = MDS_SchedulerPeekThread();
 
+    MDS_LOG_D("[kernel] scheduler thread startup with thread(%p) entry:%p sp:%p priority:%u",
+              toThread, toThread->entry, toThread->stackPoint, toThread->currPrio.priority);
+
+    MDS_ThreadSetState(toThread, MDS_THREAD_STATE_RUNNING);
     g_sysCurrThread = toThread;
-    toThread->state = MDS_THREAD_STATE_RUNNING;
-
-    MDS_SCHEDULER_DEBUG("scheduler thread startup with thread(%p) entry:%p sp:%p priority:%u", toThread,
-                        toThread->entry, toThread->stackPoint, toThread->currPrio);
 
     MDS_CoreSchedulerStartup(&(toThread->stackPoint));
 }
 
 MDS_Thread_t *MDS_KernelCurrentThread(void)
 {
+    // cpuInfo
     return (g_sysCurrThread);
-}
-
-void MDS_KernelEnterCritical(void)
-{
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-
-    g_sysCriticalNest += 1;
-
-    MDS_CoreInterruptRestore(lock);
-}
-
-void MDS_KernelExitCritical(void)
-{
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-
-    g_sysCriticalNest -= 1;
-    if (g_sysCriticalNest > 0) {
-        MDS_CoreInterruptRestore(lock);
-        return;
-    } else {
-        g_sysCriticalNest = 0;
-        MDS_CoreInterruptRestore(lock);
-    }
-
-    if (MDS_KernelCurrentThread() != NULL) {
-        MDS_KernelSchedulerCheck();
-    }
-}
-
-size_t MDS_KernelGetCritical(void)
-{
-    return (g_sysCriticalNest);
 }
 
 MDS_Tick_t MDS_KernelGetSleepTick(void)
 {
     MDS_Tick_t sleepTick = 0;
 
-    MDS_Item_t lock = MDS_CoreInterruptLock();
+    MDS_Lock_t lock = MDS_CriticalLock(&(g_sysScheduler.spinlock));
 
-    if (MDS_SchedulerHighestPriorityThread() == NULL) {
+    // get all cpu is idle
+    if (MDS_SchedulerPeekThread() == MDS_KernelIdleThread()) {
         MDS_Tick_t nextTick = MDS_SysTimerNextTick();
         MDS_Tick_t currTick = MDS_ClockGetTickCount();
         sleepTick = (nextTick > currTick) ? (nextTick - currTick) : (0);
     }
 
-    MDS_CoreInterruptRestore(lock);
+    MDS_CriticalRestore(&(g_sysScheduler.spinlock), lock);
 
     return (sleepTick);
 }
 
-void MDS_KernelCompensateTick(MDS_Tick_t tickcount)
+void MDS_KernelCompensateTick(MDS_Tick_t ticks)
 {
-    MDS_Item_t lock = MDS_CoreInterruptLock();
-
-    MDS_Tick_t currTick = MDS_ClockGetTickCount() + tickcount;
-    MDS_ClockSetTickCount(currTick);
-    MDS_SysTimerCheck();
-
-    MDS_CoreInterruptRestore(lock);
+    MDS_ClockIncTickCount(ticks);
 }
