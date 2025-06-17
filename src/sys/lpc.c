@@ -14,7 +14,7 @@
 #include "mds_lpc.h"
 
 /* Define  ----------------------------------------------------------------- */
-MDS_LOG_MODULE_DEFINE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
+MDS_LOG_MODULE_DECLARE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 /* Typedef ----------------------------------------------------------------- */
 typedef struct MDS_LPC_Manager {
@@ -49,7 +49,7 @@ static void LPC_DeviceSuspend(MDS_LPC_Sleep_t sleep)
 {
     MDS_LPC_Device_t *iter = NULL;
 
-    MDS_LIST_FOREACH_NEXT (iter, node, &g_lpcDevList) {
+    MDS_DLIST_FOREACH_NEXT (iter, node, &g_lpcDevList) {
         if ((iter->ops != NULL) && (iter->ops->suspend != NULL)) {
             iter->ops->suspend(iter->dev, sleep);
         }
@@ -60,7 +60,7 @@ static void LPC_DeviceResume(MDS_LPC_Run_t run)
 {
     MDS_LPC_Device_t *iter = NULL;
 
-    MDS_LIST_FOREACH_PREV (iter, node, &g_lpcDevList) {
+    MDS_DLIST_FOREACH_PREV (iter, node, &g_lpcDevList) {
         if ((iter->ops != NULL) && (iter->ops->resume != NULL)) {
             iter->ops->resume(iter->dev, run);
         }

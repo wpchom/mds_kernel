@@ -151,7 +151,7 @@ MDS_Err_t MDS_EventSet(MDS_Event_t *event, MDS_Mask_t set)
 
     event->value |= set;
     MDS_Thread_t *iter = NULL;
-    MDS_LIST_FOREACH_NEXT (iter, nodeWait.node, &(event->queueWait.list)) {
+    MDS_DLIST_FOREACH_NEXT (iter, nodeWait.node, &(event->queueWait.list)) {
         err = MDS_EINVAL;
         if ((iter->eventOpt & MDS_EVENT_OPT_AND) != 0U) {
             if ((iter->eventMask & event->value) == iter->eventMask) {

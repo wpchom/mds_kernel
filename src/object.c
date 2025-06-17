@@ -103,7 +103,7 @@ MDS_Object_t *MDS_ObjectFind(const MDS_ObjectType_t type, const char *name)
     MDS_Lock_t lock = MDS_CriticalLock(&(g_objectList[type].spinlock));
 
     MDS_Object_t *iter = NULL;
-    MDS_LIST_FOREACH_NEXT (iter, node, &(g_objectList[type].list)) {
+    MDS_DLIST_FOREACH_NEXT (iter, node, &(g_objectList[type].list)) {
         if (strncmp(name, iter->name, sizeof(iter->name)) == 0) {
             find = iter;
             break;

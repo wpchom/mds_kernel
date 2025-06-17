@@ -128,7 +128,7 @@ MDS_Err_t MDS_KernelWaitQueueSuspend(MDS_WaitQueue_t *queueWait, MDS_Thread_t *t
 
     if (isPrio) {
         MDS_Thread_t *iter = NULL;
-        MDS_LIST_FOREACH_NEXT (iter, nodeWait.node, &(queueWait->list)) {
+        MDS_DLIST_FOREACH_NEXT (iter, nodeWait.node, &(queueWait->list)) {
             if (thread->currPrio.priority < iter->currPrio.priority) {
                 find = iter;
                 break;

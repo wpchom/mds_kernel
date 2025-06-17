@@ -62,7 +62,7 @@ size_t MDS_TreeForeachNode(const MDS_TreeNode_t *tree,
 
     size_t cnt = 1;
     MDS_TreeNode_t *iter = NULL;
-    MDS_LIST_FOREACH_NEXT (iter, sibling, &(tree->child)) {
+    MDS_DLIST_FOREACH_NEXT (iter, sibling, &(tree->child)) {
         cnt += MDS_TreeForeachNode(iter, func, arg);
     }
 

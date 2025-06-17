@@ -139,8 +139,8 @@ ExperimentalAutoDetectBinPacking: false
 FixNamespaceComments: false
 ForEachMacros:
   - MDS_LOOP
-  - MDS_LIST_FOREACH_NEXT
-  - MDS_LIST_FOREACH_PREV
+  - MDS_DLIST_FOREACH_NEXT
+  - MDS_DLIST_FOREACH_PREV
   - MDS_SECTION_FOREACH
 IfMacros:
   - IF
