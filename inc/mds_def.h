@@ -34,17 +34,11 @@ typedef uint64_t MDS_Tick_t;
 typedef uint32_t MDS_Tick_t;
 #endif
 
+typedef uintptr_t MDS_Mask_t;
+
 typedef struct MDS_TimeStamp {
     int64_t ts;
 } MDS_TimeStamp_t;
-
-typedef struct MDS_Lock {
-    intptr_t key;
-} MDS_Lock_t;
-
-typedef struct MDS_Mask {
-    uintptr_t mask;
-} MDS_Mask_t;
 
 typedef struct MDS_Timeout {
     MDS_Tick_t ticks;

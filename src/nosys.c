@@ -205,7 +205,7 @@ MDS_Err_t MDS_EventInit(MDS_Event_t *event, const char *name)
 
     MDS_Err_t err = MDS_ObjectInit(&(event->object), MDS_OBJECT_TYPE_EVENT, name);
     if (err == MDS_EOK) {
-        event->value.mask = 0U;
+        event->value = 0U;
     }
 
     return (err);
@@ -224,7 +224,7 @@ MDS_Event_t *MDS_EventCreate(const char *name)
     MDS_Event_t *event = (MDS_Event_t *)MDS_ObjectCreate(sizeof(MDS_Event_t),
                                                          MDS_OBJECT_TYPE_EVENT, name);
     if (event != NULL) {
-        event->value.mask = 0U;
+        event->value = 0U;
     }
 
     return (event);
@@ -246,7 +246,7 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_EventOpt_t opt,
     MDS_ASSERT((opt & (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR)) !=
                (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR));
 
-    if ((mask.mask == 0U) || ((opt & (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR)) == 0U)) {
+    if ((mask == 0U) || ((opt & (MDS_EVENT_OPT_AND | MDS_EVENT_OPT_OR)) == 0U)) {
         return (MDS_EINVAL);
     }
 
@@ -255,14 +255,13 @@ MDS_Err_t MDS_EventWait(MDS_Event_t *event, MDS_Mask_t mask, MDS_EventOpt_t opt,
 
     MDS_LOOP {
         MDS_Lock_t lock = MDS_CoreInterruptLock();
-        if ((((opt & MDS_EVENT_OPT_AND) != 0U) &&
-             ((event->value.mask & mask.mask) == mask.mask)) ||
-            (((opt & MDS_EVENT_OPT_OR) != 0U) && ((event->value.mask & mask.mask) != 0U))) {
+        if ((((opt & MDS_EVENT_OPT_AND) != 0U) && ((event->value & mask) == mask)) ||
+            (((opt & MDS_EVENT_OPT_OR) != 0U) && ((event->value & mask) != 0U))) {
             if (recv != NULL) {
                 *recv = event->value;
             }
             if ((opt & MDS_EVENT_OPT_NOCLR) == 0U) {
-                event->value.mask &= (~mask.mask);
+                event->value &= (~mask);
             }
             err = MDS_EOK;
         }
@@ -282,7 +281,7 @@ MDS_Err_t MDS_EventSet(MDS_Event_t *event, MDS_Mask_t mask)
     MDS_ASSERT(MDS_ObjectGetType(&(event->object)) == MDS_OBJECT_TYPE_EVENT);
 
     MDS_Lock_t lock = MDS_CoreInterruptLock();
-    event->value.mask |= mask.mask;
+    event->value |= mask;
     MDS_CoreInterruptRestore(lock);
 
     return (MDS_EOK);
@@ -294,7 +293,7 @@ MDS_Err_t MDS_EventClr(MDS_Event_t *event, MDS_Mask_t mask)
     MDS_ASSERT(MDS_ObjectGetType(&(event->object)) == MDS_OBJECT_TYPE_EVENT);
 
     MDS_Lock_t lock = MDS_CoreInterruptLock();
-    event->value.mask &= (~mask.mask);
+    event->value &= (~mask);
     MDS_CoreInterruptRestore(lock);
 
     return (MDS_EOK);

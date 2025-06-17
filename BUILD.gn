@@ -32,12 +32,9 @@ declare_args() {
   mds_idle_thread_stacksize = 384
   mds_idle_thread_ticks = 16
   mds_idle_thread_hooks = 0
-
-  # lpc
-  mds_lpc_log_level = "MDS_LOG_LEVEL_INF"
 }
 
-config("mds_kernel_cfg") {
+config("mds_kernel_config") {
   include_dirs = [ "inc" ]
 
   defines = []
@@ -103,14 +100,6 @@ config("mds_kernel_cfg") {
 
   defines += [ "CONFIG_MDS_TIMER_SKIPLIST_LEVEL=${mds_timer_skiplist_level}" ]
   defines += [ "CONFIG_MDS_TIMER_SKIPLIST_SHIFT=${mds_timer_skiplist_shift}" ]
-
-  assert(mds_lpc_log_level == "MDS_LOG_LEVEL_OFF" ||
-         mds_lpc_log_level == "MDS_LOG_LEVEL_FAT" ||
-         mds_lpc_log_level == "MDS_LOG_LEVEL_ERR" ||
-         mds_lpc_log_level == "MDS_LOG_LEVEL_WRN" ||
-         mds_lpc_log_level == "MDS_LOG_LEVEL_INF" ||
-         mds_lpc_log_level == "MDS_LOG_LEVEL_DBG")
-  defines += [ "CONFIG_MDS_LPC_LOG_LEVEL=${mds_lpc_log_level}" ]
 }
 
 static_library("mds_kernel") {
@@ -195,5 +184,5 @@ static_library("mds_kernel") {
     sources += [ "src/nosys.c" ]
   }
 
-  public_configs = [ ":mds_kernel_cfg" ]
+  public_configs = [ ":mds_kernel_config" ]
 }

@@ -110,7 +110,7 @@ static MDS_Err_t THREAD_Init(MDS_Thread_t *thread, MDS_ThreadEntry_t entry, MDS_
 
     MDS_ThreadSetState(thread, MDS_THREAD_STATE_INACTIVED);
     thread->eventOpt = MDS_EVENT_OPT_NONE;
-    thread->eventMask.mask = 0U;
+    thread->eventMask = 0U;
 
     MDS_HOOK_CALL(KERNEL, thread, (thread, MDS_KERNEL_TRACE_THREAD_INIT));
 

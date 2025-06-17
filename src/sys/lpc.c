@@ -14,7 +14,7 @@
 #include "mds_lpc.h"
 
 /* Define  ----------------------------------------------------------------- */
-MDS_LOG_MODULE_DEFINE(lpc, CONFIG_MDS_LPC_LOG_LEVEL);
+MDS_LOG_MODULE_DEFINE(kernel, CONFIG_MDS_KERNEL_LOG_LEVEL);
 
 /* Typedef ----------------------------------------------------------------- */
 typedef struct MDS_LPC_Manager {
@@ -164,8 +164,8 @@ __attribute__((unused)) static void LPC_SleepModeSwitch(MDS_LPC_Manager_t *mgr)
         mgr->hook(MDS_LPC_EVENT_SLEEP_EXIT, sleepMode);
     }
 
-    MDS_LOG_W("[lpc] sleepMode:%u plan:%u real:%u resume runMode:%d", sleepMode,
-              (uint32_t)planSleep, (uint32_t)realSleep, mgr->runMode);
+    MDS_LOG_W("[lpc] sleepMode:%d plan:%lu real:%lu resume runMode:%d", sleepMode,
+              (unsigned long)(planSleep), (unsigned long)(realSleep), mgr->runMode);
 }
 
 static void LPC_RunModeSwitch(MDS_LPC_Manager_t *mgr)
@@ -382,8 +382,8 @@ MDS_Err_t MDS_LPC_RunModeWait(MDS_LPC_Run_t run, MDS_Timeout_t timeout)
 
     MDS_MutexRelease(&(g_lpcMgr.runMutex));
 
-    MDS_LOG_W("[lpc] wait run:%u curr:%u timeout:%u err:%d", run, g_lpcMgr.runMode,
-              (uint32_t)(timeout.ticks), err);
+    MDS_LOG_W("[lpc] wait run:%d curr:%d timeout:%lu err:%d", run, g_lpcMgr.runMode,
+              (unsigned long)(timeout.ticks), err);
 
     return (err);
 }

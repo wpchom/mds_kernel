@@ -20,11 +20,7 @@ extern "C" {
 #endif
 
 /* Typedef ----------------------------------------------------------------- */
-typedef struct MDS_DeviceCmd {
-    uint32_t cmd;
-} MDS_DeviceCmd_t;
-
-#define MDS_DEVICE_COMMAND(c) ((MDS_DeviceCmd_t) {.cmd = c})
+typedef intptr_t MDS_DeviceCmd_t;
 
 enum MDS_DEVICE_Cmd {
     MDS_DEVICE_CMD_INIT,

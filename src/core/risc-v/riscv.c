@@ -320,7 +320,7 @@ extern void __StackTop();
 #endif
 
 /* CoreFunction ------------------------------------------------------------ */
-inline intptr_t MDS_CoreInterruptCurrent(void)
+intptr_t MDS_CoreInterruptCurrent(void)
 {
     intptr_t mcause;
 
@@ -329,7 +329,7 @@ inline intptr_t MDS_CoreInterruptCurrent(void)
     return (mcause);
 }
 
-inline MDS_Lock_t MDS_CoreInterruptLock(void)
+MDS_Lock_t MDS_CoreInterruptLock(void)
 {
     register MDS_Lock_t result;
 
@@ -338,12 +338,12 @@ inline MDS_Lock_t MDS_CoreInterruptLock(void)
     return (result);
 }
 
-inline void MDS_CoreInterruptRestore(MDS_Lock_t lock)
+void MDS_CoreInterruptRestore(MDS_Lock_t lock)
 {
     __asm volatile("csrw        mstatus, %0" : : "r"(lock.key) : "memory");
 }
 
-inline void MDS_CoreIdleSleep(void)
+void MDS_CoreIdleSleep(void)
 {
     __asm volatile("wfi");
 }

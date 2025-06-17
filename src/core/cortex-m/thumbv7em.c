@@ -156,7 +156,7 @@ __attribute__((always_inline)) static inline uintptr_t CORE_GetPSP(void)
     return (result);
 }
 
-inline void MDS_CoreIdleSleep(void)
+void MDS_CoreIdleSleep(void)
 {
     __asm volatile("wfi");
 }

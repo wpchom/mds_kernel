@@ -158,7 +158,6 @@ static void MDS_MemPoolFreeBlk(MDS_MemPool_t *memPool, union MDS_MemPoolHeader *
 {
     MDS_ASSERT(MDS_ObjectGetType(&(memPool->object)) == MDS_OBJECT_TYPE_MEMPOOL);
 
-    MDS_Err_t err = MDS_EOK;
     MDS_Thread_t *thread = NULL;
 
     MDS_Lock_t lock = MDS_CriticalLock(&(memPool->spinlock));

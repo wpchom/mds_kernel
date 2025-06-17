@@ -126,6 +126,10 @@ static inline void MDS_ClockDelayCount(MDS_Timeout_t timeout)
 }
 
 /* Critical ---------------------------------------------------------------- */
+typedef struct MDS_Lock {
+    intptr_t key;
+} MDS_Lock_t;
+
 typedef struct MDS_SpinLock {
 #if defined(CONFIG_MDS_KERNEL_SMP_CPUS) && (CONFIG_MDS_KERNEL_SMP_CPUS > 1)
     intptr_t locked;
