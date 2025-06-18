@@ -33,7 +33,7 @@ MDS_Device_t *MDS_DeviceFind(const char *name)
 }
 
 void MDS_DeviceRegisterHook(const MDS_Device_t *device,
-                            void (*hook)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd))
+                            void (*hook)(const MDS_Device_t *device, MDS_Item_t cmd))
 {
     MDS_ASSERT(device != NULL);
 
@@ -462,7 +462,7 @@ bool MDS_DeviceIsPeriph(const MDS_Device_t *device)
     MDS_ASSERT(device != NULL);
 
     return ((device->flags & (MDS_DEVICE_FLAG_MODULE | MDS_DEVICE_FLAG_ADAPTR |
-                                   MDS_DEVICE_FLAG_PERIPH)) == MDS_DEVICE_FLAG_PERIPH);
+                              MDS_DEVICE_FLAG_PERIPH)) == MDS_DEVICE_FLAG_PERIPH);
 }
 
 const MDS_DevProbeId_t *MDS_DeviceGetId(const MDS_Device_t *device)

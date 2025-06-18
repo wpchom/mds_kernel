@@ -20,8 +20,6 @@ extern "C" {
 #endif
 
 /* Typedef ----------------------------------------------------------------- */
-typedef intptr_t MDS_DeviceCmd_t;
-
 enum MDS_DEVICE_Cmd {
     MDS_DEVICE_CMD_INIT,
     MDS_DEVICE_CMD_DEINIT,
@@ -44,13 +42,13 @@ typedef union MDS_DevHandle {
 } MDS_DevHandle_t;
 
 typedef struct MDS_DevDriver {
-    MDS_Err_t (*control)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd, MDS_Arg_t *arg);
+    MDS_Err_t (*control)(const MDS_Device_t *device, MDS_Item_t cmd, MDS_Arg_t *arg);
 } MDS_DevDriver_t;
 
 struct MDS_Device {
     MDS_Object_t object;
     MDS_Mask_t flags;
-    void (*hook)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd);
+    void (*hook)(const MDS_Device_t *device, MDS_Item_t cmd);
 };
 
 struct MDS_DevModule {
@@ -94,7 +92,7 @@ typedef struct MDS_DevDumpData {
 /* Function ---------------------------------------------------------------- */
 MDS_Device_t *MDS_DeviceFind(const char *name);
 void MDS_DeviceRegisterHook(const MDS_Device_t *device,
-                            void (*hook)(const MDS_Device_t *device, MDS_DeviceCmd_t cmd));
+                            void (*hook)(const MDS_Device_t *device, MDS_Item_t cmd));
 
 MDS_Err_t MDS_DevModuleInit(MDS_DevModule_t *module, const char *name,
                             const MDS_DevDriver_t *driver, MDS_DevHandle_t *handle,
